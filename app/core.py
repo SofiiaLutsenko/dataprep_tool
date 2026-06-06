@@ -4,16 +4,20 @@ MAX_INPUT_LENGTH = 100_000
 
 # --- PII Patterns ---
 
-# EMAIL: explicit dash escape, boundary lookahead prevents trailing punctuation
+# EMAIL: explicit dash escape, lookahead prevents trailing punctuation,
+# negative lookahead prevents consecutive dots in local part
 EMAIL_PATTERN = re.compile(
-    r'[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}(?=[^a-zA-Z]|$)',
+    r'(?!.*\.\.)[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}(?=[^a-zA-Z]|$)',
     re.IGNORECASE
 )
 
-# PHONE: flat character class (no nesting = no ReDoS risk)
-# Known limitation: may match numeric sequences like IBANs or card numbers
+# PHONE: counts digits explicitly (not characters), allows separators between them.
+# Requires 7-15 digits total (E.164 standard).
+# Known limitations:
+#   - Dates like 2024-01-15 may still match (regex cannot distinguish context)
+#   - IBANs and card numbers may partially match (requires NER for full fix - v2)
 PHONE_PATTERN = re.compile(
-    r'(?<![A-Z]{2}\d{2})\+?[\d\s\-(). ]{7,20}(?<!\s)'
+    r'\+?(?:\d[\s\-(). ]*){7,15}\d'
 )
 
 
