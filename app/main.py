@@ -1,16 +1,23 @@
-from app.config import settings
 import io
+import csv
 import logging
 import urllib.parse
 
-from fastapi import FastAPI, HTTPException, UploadFile, File
+from fastapi import FastAPI, HTTPException, UploadFile, File, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, Response
 from pydantic import BaseModel, field_validator
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
+from app.config import settings
 from app.core import mask_all, MAX_INPUT_LENGTH
 
 logger = logging.getLogger("dataprep")
+
+limiter = Limiter(key_func=get_remote_address)
 
 app = FastAPI(
     title="DataPrep Tool",
@@ -18,7 +25,10 @@ app = FastAPI(
     version=settings.app_version
 )
 
-# --- Middleware ---
+# Trust X-Forwarded-For only from localhost (Nginx on same machine)
+app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="127.0.0.1")
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Request size limiting is handled at the infrastructure level (Nginx).
 # See deployment configuration for client_max_body_size setting.
@@ -53,11 +63,13 @@ class TextResponse(BaseModel):
 # --- File Upload Helpers ---
 
 ALLOWED_EXTENSIONS = {".txt", ".csv"}
+CSV_INJECTION_CHARS = ("=", "@", "+", "-")
 MAX_FILE_BYTES = 5_242_880  # 5MB
 
 
-def _is_text_content(data: bytes) -> bool:
-    """Reject binary files by checking for null bytes in first 1024 bytes."""
+def _is_utf8_text_content(data: bytes) -> bool:
+    """Reject binary files by checking for null bytes in first 1024 bytes.
+    Note: UTF-16 encoded files will also be rejected — UTF-8 is required."""
     return b"\x00" not in data[:1024]
 
 
@@ -74,6 +86,26 @@ async def _read_file_chunked(file: UploadFile, max_bytes: int) -> bytes:
     return bytes(content)
 
 
+def _sanitize_csv(text: str) -> str:
+    """Prevent CSV injection using proper CSV parsing.
+    Uses csv module to correctly handle quoted fields with commas."""
+    input_stream = io.StringIO(text)
+    output_stream = io.StringIO()
+
+    reader = csv.reader(input_stream)
+    writer = csv.writer(output_stream)
+
+    for row in reader:
+        clean_row = []
+        for field in row:
+            if field.lstrip().startswith(CSV_INJECTION_CHARS):
+                field = f"'{field}"
+            clean_row.append(field)
+        writer.writerow(clean_row)
+
+    return output_stream.getvalue()
+
+
 # --- Endpoints ---
 
 @app.get("/health")
@@ -82,12 +114,13 @@ def health_check():
 
 
 @app.post("/api/v1/mask/text", response_model=TextResponse)
-def mask_text(request: TextRequest):
+@limiter.limit("30/minute")
+def mask_text(request: Request, body: TextRequest):
     try:
-        result = mask_all(request.text)
+        result = mask_all(body.text)
         return TextResponse(
             masked_text=result,
-            chars_processed=len(request.text)
+            chars_processed=len(body.text)
         )
     except TypeError:
         logger.warning("Invalid input type received")
@@ -98,7 +131,8 @@ def mask_text(request: TextRequest):
 
 
 @app.post("/api/v1/mask/file")
-async def mask_file(file: UploadFile = File(...)):
+@limiter.limit("10/minute")
+async def mask_file(request: Request, file: UploadFile = File(...)):
     # Validate extension
     filename = file.filename or "upload"
     ext = "." + filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
@@ -112,10 +146,10 @@ async def mask_file(file: UploadFile = File(...)):
     content = await _read_file_chunked(file, MAX_FILE_BYTES)
 
     # Validate content (not just extension)
-    if not _is_text_content(content):
+    if not _is_utf8_text_content(content):
         raise HTTPException(
             status_code=422,
-            detail="File appears to be binary. Please upload a plain text file"
+            detail="File appears to be binary or non-UTF-8 encoded. Please upload a UTF-8 encoded file"
         )
 
     # Decode
@@ -137,8 +171,8 @@ async def mask_file(file: UploadFile = File(...)):
     # Sanitize filename — prevents Header Injection
     safe_filename = urllib.parse.quote(filename, safe=".-_")
 
-    return StreamingResponse(
-        io.BytesIO(masked.encode("utf-8")),
+    return Response(
+        content=masked.encode("utf-8"),
         media_type="text/plain",
         headers={
             "Content-Disposition": f"attachment; filename*=utf-8''masked_{safe_filename}"
