@@ -1,3 +1,4 @@
+from app.config import settings
 import io
 import logging
 import urllib.parse
@@ -14,7 +15,7 @@ logger = logging.getLogger("dataprep")
 app = FastAPI(
     title="DataPrep Tool",
     description="PII masking API for HR and Finance workflows",
-    version="0.1.0"
+    version=settings.app_version
 )
 
 # --- Middleware ---
@@ -25,7 +26,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # restrict in production via env
+    allow_origins=settings.cors_origins,
     allow_methods=["POST", "GET"],
     allow_headers=["*"],
 )
