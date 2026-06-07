@@ -1,23 +1,25 @@
-import io
 import csv
+import io
 import logging
 import urllib.parse
 
-from fastapi.security import APIKeyHeader
-from fastapi import Depends
-from fastapi import FastAPI, HTTPException, UploadFile, File, Request
+import anyio
+from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse, Response
+from fastapi.responses import Response
+from fastapi.security import APIKeyHeader
 from pydantic import BaseModel, field_validator
 from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 from app.config import settings
-from app.core import mask_all, MAX_INPUT_LENGTH
+from app.core import MAX_INPUT_LENGTH, mask_all
 
 logger = logging.getLogger("dataprep")
+
+# --- Auth ---
 
 API_KEY_HEADER = APIKeyHeader(name="X-API-Key", auto_error=False)
 
@@ -28,6 +30,9 @@ async def verify_api_key(api_key: str = Depends(API_KEY_HEADER)) -> None:
             status_code=401,
             detail="Invalid or missing API key"
         )
+
+
+# --- App ---
 
 limiter = Limiter(key_func=get_remote_address)
 
@@ -93,7 +98,7 @@ async def _read_file_chunked(file: UploadFile, max_bytes: int) -> bytes:
         if len(content) > max_bytes:
             raise HTTPException(
                 status_code=413,
-                detail="File too large. Maximum size is 5MB"
+                detail=f"File too large. Maximum size is {max_bytes // 1000}KB"
             )
     return bytes(content)
 
@@ -173,9 +178,13 @@ async def mask_file(request: Request, file: UploadFile = File(...)):
             detail="File encoding not supported. Please upload a UTF-8 encoded file"
         )
 
-    # Mask
+    # Sanitize CSV injection before masking
+    if ext == ".csv":
+        text = _sanitize_csv(text)
+
+    # Mask — run in thread pool to avoid blocking event loop
     try:
-        masked = mask_all(text)
+        masked = await anyio.to_thread.run_sync(mask_all, text)
     except ValueError:
         logger.warning("File content validation failed")
         raise HTTPException(status_code=400, detail="Invalid file content")
