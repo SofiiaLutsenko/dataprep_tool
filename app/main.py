@@ -3,6 +3,8 @@ import csv
 import logging
 import urllib.parse
 
+from fastapi.security import APIKeyHeader
+from fastapi import Depends
 from fastapi import FastAPI, HTTPException, UploadFile, File, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, Response
@@ -16,6 +18,16 @@ from app.config import settings
 from app.core import mask_all, MAX_INPUT_LENGTH
 
 logger = logging.getLogger("dataprep")
+
+API_KEY_HEADER = APIKeyHeader(name="X-API-Key", auto_error=False)
+
+
+async def verify_api_key(api_key: str = Depends(API_KEY_HEADER)) -> None:
+    if not api_key or api_key != settings.api_key:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid or missing API key"
+        )
 
 limiter = Limiter(key_func=get_remote_address)
 
@@ -64,7 +76,7 @@ class TextResponse(BaseModel):
 
 ALLOWED_EXTENSIONS = {".txt", ".csv"}
 CSV_INJECTION_CHARS = ("=", "@", "+", "-")
-MAX_FILE_BYTES = 5_242_880  # 5MB
+MAX_FILE_BYTES = 99_000  # aligned with MAX_INPUT_LENGTH in core.py (~100KB)
 
 
 def _is_utf8_text_content(data: bytes) -> bool:
@@ -113,7 +125,7 @@ def health_check():
     return {"status": "ok"}
 
 
-@app.post("/api/v1/mask/text", response_model=TextResponse)
+@app.post("/api/v1/mask/text", response_model=TextResponse, dependencies=[Depends(verify_api_key)])
 @limiter.limit("30/minute")
 def mask_text(request: Request, body: TextRequest):
     try:
@@ -130,7 +142,7 @@ def mask_text(request: Request, body: TextRequest):
         raise HTTPException(status_code=400, detail="Invalid input data")
 
 
-@app.post("/api/v1/mask/file")
+@app.post("/api/v1/mask/file", dependencies=[Depends(verify_api_key)])
 @limiter.limit("10/minute")
 async def mask_file(request: Request, file: UploadFile = File(...)):
     # Validate extension
