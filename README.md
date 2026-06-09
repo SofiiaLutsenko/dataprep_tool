@@ -1,5 +1,3 @@
----
-
 ## Development
 
 ### Setup Backend
@@ -27,7 +25,6 @@ python3 -m http.server 5500
 
 Visit `http://localhost:5500`
 
----
 
 ## Roadmap (v2)
 
@@ -36,5 +33,3 @@ Visit `http://localhost:5500`
 - [ ] User authentication & accounts
 - [ ] Increased file size limits
 - [ ] Named Entity Recognition (NER)
-
----
