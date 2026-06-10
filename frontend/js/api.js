@@ -1,7 +1,6 @@
 // api.js — all communication with the backend
 
-const API_BASE = 'http://localhost:8000';
-const API_KEY = 'supersecretkey123';
+const API_BASE = 'https://dataprep-tool.up.railway.app';
 
 async function maskFile(file) {
   const formData = new FormData();
@@ -9,11 +8,12 @@ async function maskFile(file) {
 
   const response = await fetch(`${API_BASE}/api/v1/mask/file`, {
     method: 'POST',
-    headers: {
-      'X-API-Key': API_KEY,
-    },
     body: formData,
   });
+
+  if (response.status === 429) {
+    throw new Error('Too many requests. Please wait a minute before uploading again.');
+  }
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({ detail: 'Unknown error' }));

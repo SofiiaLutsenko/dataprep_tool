@@ -58,21 +58,13 @@ def test_mask_text_missing_field():
     assert response.status_code == 422
 
 
-def test_mask_text_no_api_key():
+def test_mask_text_without_api_key_success():
     response = client.post(
         "/api/v1/mask/text",
         json={"text": "hello"}
     )
-    assert response.status_code == 401
-
-
-def test_mask_text_wrong_api_key():
-    response = client.post(
-        "/api/v1/mask/text",
-        json={"text": "hello"},
-        headers={"X-API-Key": "wrongkey"}
-    )
-    assert response.status_code == 401
+    assert response.status_code == 200
+    assert "masked_text" in response.json()
 
 
 # --- File endpoint ---
@@ -123,4 +115,5 @@ def test_mask_file_no_api_key():
         "/api/v1/mask/file",
         files={"file": ("resume.txt", io.BytesIO(content), "text/plain")}
     )
-    assert response.status_code == 401
+    # file endpoint is public — no API key required
+    assert response.status_code == 200

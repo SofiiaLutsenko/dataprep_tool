@@ -130,7 +130,7 @@ def health_check():
     return {"status": "ok"}
 
 
-@app.post("/api/v1/mask/text", response_model=TextResponse, dependencies=[Depends(verify_api_key)])
+@app.post("/api/v1/mask/text", response_model=TextResponse)
 @limiter.limit("30/minute")
 def mask_text(request: Request, body: TextRequest):
     try:
@@ -147,8 +147,8 @@ def mask_text(request: Request, body: TextRequest):
         raise HTTPException(status_code=400, detail="Invalid input data")
 
 
-@app.post("/api/v1/mask/file", dependencies=[Depends(verify_api_key)])
-@limiter.limit("10/minute")
+@app.post("/api/v1/mask/file")
+@limiter.limit("5/minute")
 async def mask_file(request: Request, file: UploadFile = File(...)):
     # Validate extension
     filename = file.filename or "upload"
