@@ -7,8 +7,8 @@
 
 body {
   font-family: 'Inter', system-ui, sans-serif;
-  background-color: #F1F5F9;
-  color: #334155;
+  background-color: #01192b; /* Самый темный синий для фона страницы */
+  color: #c2d1d9;            /* Светло-серый с синевой для базового текста */
   min-height: 100vh;
   display: flex;
   align-items: center;
@@ -35,33 +35,33 @@ body {
   font-size: 1.5rem;
   font-weight: 600;
   letter-spacing: -0.02em;
-  color: #334155;
+  color: #e1e5e8; /* Самый светлый/белый для названия */
 }
 
 .logo-accent {
-  color: #84A59D;
+  color: #c2d1d9; /* Мягкий сине-серый акцент для слова Tool */
 }
 
 .tagline {
   margin-top: 6px;
   font-size: 0.875rem;
-  color: #64748B;
+  color: #99abbb; /* Приглушенный синий для подзаголовка */
 }
 
 /* === Card === */
 .card {
-  background: #ffffff;
+  background: #113f5c; /* Глубокий синий для карточек */
   border-radius: 16px;
   padding: 32px;
   display: flex;
   flex-direction: column;
   gap: 16px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3); /* Более глубокая тень для темной темы */
 }
 
 /* === Drop Zone === */
 .dropzone {
-  border: 1.5px dashed #CBD5E1;
+  border: 1.5px dashed #436380; /* Четкая приглушенная граница */
   border-radius: 12px;
   padding: 40px 24px;
   display: flex;
@@ -74,34 +74,34 @@ body {
 
 .dropzone:hover,
 .dropzone.dragover {
-  border-color: #84A59D;
-  background-color: #F8FAFC;
+  border-color: #c2d1d9;
+  background-color: #1c4b6b; /* Легкое высветление при наведении */
 }
 
 .dropzone-icon {
-  color: #94A3B8;
+  color: #436380;
   transition: color 0.2s ease-in-out;
 }
 
 .dropzone:hover .dropzone-icon,
 .dropzone.dragover .dropzone-icon {
-  color: #84A59D;
+  color: #c2d1d9;
 }
 
 .dropzone-text {
   font-size: 0.9375rem;
   font-weight: 500;
-  color: #475569;
+  color: #e1e5e8; /* Яркий текст */
 }
 
 .dropzone-subtext {
   font-size: 0.8125rem;
-  color: #94A3B8;
+  color: #99abbb; /* "or" между кнопкой и текстом */
 }
 
 .dropzone-hint {
   font-size: 0.75rem;
-  color: #94A3B8;
+  color: #e6e9ec; /* Текст .txt or .csv */
   margin-top: 4px;
 }
 
@@ -110,15 +110,15 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
-  background: #F8FAFC;
+  background: #042a44;
   border-radius: 8px;
   padding: 10px 14px;
   font-size: 0.875rem;
-  color: #475569;
+  color: #c2d1d9;
 }
 
 .file-info svg {
-  color: #84A59D;
+  color: #c2d1d9;
   flex-shrink: 0;
 }
 
@@ -133,7 +133,7 @@ body {
   background: none;
   border: none;
   cursor: pointer;
-  color: #94A3B8;
+  color: #436380;
   font-size: 0.875rem;
   padding: 2px 4px;
   border-radius: 4px;
@@ -141,38 +141,38 @@ body {
 }
 
 .btn-clear:hover {
-  color: #334155;
+  color: #e1e5e8;
 }
 
 /* === Buttons === */
 .btn-primary {
   width: 100%;
   padding: 12px;
-  background-color: #84A59D;
-  color: #ffffff;
+  background-color: #c2d1d9; /* Светлая контрастная кнопка на темном фоне */
+  color: #042a44;            /* Темный читаемый текст на ней */
   border: none;
   border-radius: 12px;
   font-family: inherit;
   font-size: 0.9375rem;
-  font-weight: 500;
+  font-weight: 600;          /* Чуть добавил плотности для лучшей читаемости */
   cursor: pointer;
   transition: background-color 0.2s ease-in-out, opacity 0.2s ease-in-out;
 }
 
 .btn-primary:hover:not(:disabled) {
-  background-color: #6B9089;
+  background-color: #e1e5e8; /* Становится еще ярче при наведении */
 }
 
 .btn-primary:disabled {
-  opacity: 0.45;
+  opacity: 0.25; /* Сильнее приглушаем в темной теме, если неактивна */
   cursor: not-allowed;
 }
 
 .btn-secondary {
   display: inline-block;
   padding: 8px 18px;
-  background-color: #F1F5F9;
-  color: #475569;
+  background-color: #436380; /* Кнопка "Browse file" стала темнее и заметнее */
+  color: #e1e5e8;            /* Контрастный текст на ней */
   border-radius: 8px;
   font-family: inherit;
   font-size: 0.875rem;
@@ -182,7 +182,7 @@ body {
 }
 
 .btn-secondary:hover {
-  background-color: #E2E8F0;
+  background-color: #517596; /* Эффект наведения */
 }
 
 /* === Status === */
@@ -191,32 +191,32 @@ body {
   align-items: center;
   gap: 10px;
   padding: 12px 16px;
-  background: #ffffff;
+  background: #113f5c;
   border-radius: 12px;
   font-size: 0.875rem;
-  color: #475569;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  color: #c2d1d9;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
 .status-indicator {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background-color: #94A3B8;
+  background-color: #436380;
   flex-shrink: 0;
 }
 
 .status-indicator.loading {
-  background-color: #84A59D;
+  background-color: #c2d1d9;
   animation: pulse 1.2s ease-in-out infinite;
 }
 
 .status-indicator.success {
-  background-color: #84A59D;
+  background-color: #c2d1d9;
 }
 
 .status-indicator.error {
-  background-color: #F87171;
+  background-color: #F87171; /* Оставляем стандартный красный для ошибок */
 }
 
 @keyframes pulse {
@@ -226,10 +226,10 @@ body {
 
 /* === Info Panel === */
 .info-panel {
-  background: #ffffff;
+  background: #113f5c;
   border-radius: 12px;
   padding: 20px 24px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
 .info-title {
@@ -237,7 +237,7 @@ body {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: #94A3B8;
+  color: #99abbb; /* "WHAT GETS REMOVED" стал приглушенным синим */
   margin-bottom: 12px;
 }
 
@@ -254,27 +254,27 @@ body {
   align-items: center;
   gap: 8px;
   font-size: 0.875rem;
-  color: #475569;
+  color: #c2d1d9;
 }
 
 .info-item svg {
-  color: #84A59D;
+  color: #dbe0e4;
   flex-shrink: 0;
 }
 
 .info-note {
   font-size: 0.75rem;
-  color: #94A3B8;
+  color: #99abbb; /* Текст "coming in v2" стал читаемым, но не отвлекает */
   padding-top: 10px;
-  border-top: 1px solid #F1F5F9;
+  border-top: 1px solid #042a44; /* Разделительная линия теперь темная */
 }
 
 /* === Log Panel === */
 .log-panel {
-  background: #ffffff;
+  background: #113f5c;
   border-radius: 12px;
   padding: 20px 24px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
 .log-title {
@@ -282,7 +282,7 @@ body {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: #94A3B8;
+  color: #436380;
   margin-bottom: 12px;
 }
 
@@ -295,15 +295,15 @@ body {
 
 .log-item {
   font-size: 0.8125rem;
-  color: #64748B;
+  color: #c2d1d9;
   padding: 6px 10px;
-  background: #F8FAFC;
+  background: #042a44;
   border-radius: 6px;
   font-family: 'SF Mono', 'Fira Code', monospace;
 }
 
 .log-item.success {
-  color: #84A59D;
+  color: #c2d1d9;
 }
 
 .log-item.error {
