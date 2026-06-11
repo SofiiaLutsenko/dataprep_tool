@@ -1,6 +1,6 @@
 // api.js — all communication with the backend
 
-const API_BASE = 'https://dataprep-tool.up.railway.app';
+const API_BASE = 'https://api-dataprep.sofiialutsenko.com';
 
 async function maskFile(file) {
   const formData = new FormData();
