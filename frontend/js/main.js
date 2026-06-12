@@ -6,7 +6,11 @@ const dropzone = document.getElementById('dropzone');
 const fileInput = document.getElementById('file-input');
 const btnProcess = document.getElementById('btn-process');
 const btnClear = document.getElementById('btn-clear');
+const disclaimerCheckbox = document.getElementById('disclaimer-checkbox');
 
+function updateProcessButtonState() {
+  setButtonEnabled(selectedFile !== null && disclaimerCheckbox.checked);
+}
 
 // --- File Selection ---
 
@@ -28,7 +32,7 @@ function handleFileSelect(file) {
 
   selectedFile = file;
   showFileInfo(file.name);
-  setButtonEnabled(true);
+  updateProcessButtonState();
   hideElement('status');
   clearLog();
 }
@@ -37,7 +41,7 @@ function resetAll() {
   selectedFile = null;
   fileInput.value = '';
   hideFileInfo();
-  setButtonEnabled(false);
+  updateProcessButtonState();
   hideElement('status');
   clearLog();
   dropzone.classList.remove('loading');
@@ -46,6 +50,8 @@ function resetAll() {
 fileInput.addEventListener('change', (e) => {
   handleFileSelect(e.target.files[0]);
 });
+
+disclaimerCheckbox.addEventListener('change', updateProcessButtonState);
 
 btnClear.addEventListener('click', () => {
   resetAll();
@@ -69,8 +75,14 @@ dropzone.addEventListener('drop', (e) => {
   handleFileSelect(e.dataTransfer.files[0]);
 });
 
-dropzone.addEventListener('click', (e) => {
-  if (e.target.closest('.btn-secondary')) return;
+const browseBtn = dropzone.querySelector('.btn-secondary');
+
+browseBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  fileInput.click();
+});
+
+dropzone.addEventListener('click', () => {
   fileInput.click();
 });
 

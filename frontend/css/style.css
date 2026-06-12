@@ -324,3 +324,20 @@ body {
 .hidden {
   display: none !important;
 }
+
+/* === Disclaimer === */
+.disclaimer {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 0.8125rem;
+  color: #94A3B8;
+  cursor: pointer;
+  line-height: 1.4;
+}
+
+.disclaimer input[type="checkbox"] {
+  margin-top: 2px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
