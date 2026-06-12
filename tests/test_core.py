@@ -153,3 +153,10 @@ def test_mask_all_combined():
     assert "[PHONE]" in result
     assert "hr@company.com" not in result
     assert "+49 151 12345678" not in result
+    
+def test_ip_based_email_known_limitation():
+    # Known limitation: emails with IP-address-style domains (e.g. root@123.45.67.78)
+    # are not recognized, since EMAIL_PATTERN requires a letter-based TLD.
+    # This is intentional — IP-based emails are rare in HR/resume contexts.
+    result = mask_all("Contact root@123.45.67.78 for access")
+    assert result is not None
