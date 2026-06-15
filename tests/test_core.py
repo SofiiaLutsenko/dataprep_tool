@@ -1,5 +1,6 @@
 import pytest
 from app.core import mask_emails, mask_phones, mask_all, MAX_INPUT_LENGTH
+from app.core import mask_names
 
 
 # --- Validation ---
@@ -160,3 +161,32 @@ def test_ip_based_email_known_limitation():
     # This is intentional — IP-based emails are rare in HR/resume contexts.
     result = mask_all("Contact root@123.45.67.78 for access")
     assert result is not None
+
+# --- Names: NER masking ---
+
+def test_mask_full_name():
+    result = mask_names("My name is John Smith, contact me.")
+    assert "[NAME]" in result
+    assert "John Smith" not in result
+
+def test_mask_single_first_name():
+    result = mask_names("Contact Sarah for details.")
+    assert "[NAME]" in result
+    assert "Sarah" not in result
+
+def test_tech_term_not_masked_as_name():
+    result = mask_names("I have experience with Python and Java.")
+    assert "[NAME]" not in result
+    assert "Python" in result
+    assert "Java" in result
+
+def test_tech_term_with_real_name():
+    result = mask_names("I worked with Sarah Connor using Python.")
+    assert "[NAME]" in result
+    assert "Sarah Connor" not in result
+    assert "Python" in result
+
+def test_no_names_in_text():
+    result = mask_names("This document contains no personal names.")
+    assert "[NAME]" not in result
+    

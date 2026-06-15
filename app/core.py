@@ -1,4 +1,17 @@
 import re
+import spacy
+
+# Load once at module level — loading per-request would be too slow
+_nlp = spacy.load("en_core_web_sm")
+
+# Common tech terms that spaCy's small model sometimes misclassifies as PERSON
+TECH_TERM_WHITELIST = {
+    "python", "java", "javascript", "typescript", "react", "angular", "vue",
+    "node", "django", "flask", "fastapi", "spring", "docker", "kubernetes",
+    "aws", "azure", "git", "github", "gitlab", "linux", "windows", "mongodb",
+    "postgresql", "mysql", "redis", "graphql", "rest", "html", "css", "sql",
+    "swift", "kotlin", "golang", "rust", "scala", "ruby", "php", "c++", "c#",
+}
 
 MAX_INPUT_LENGTH = 100_000
 
@@ -60,6 +73,25 @@ def mask_emails(text: str) -> str:
 
 def mask_phones(text: str) -> str:
     return PHONE_PATTERN.sub('[PHONE]', text)
+
+def mask_names(text: str) -> str:
+    """Mask person names using spaCy NER.
+    Single-word entities matching common tech terms are skipped to avoid
+    false positives (e.g. 'Python', 'React')."""
+    doc = _nlp(text)
+
+    spans = []
+    for ent in doc.ents:
+        if ent.label_ != "PERSON":
+            continue
+        if ent.text.lower() in TECH_TERM_WHITELIST:
+            continue
+        spans.append((ent.start_char, ent.end_char))
+
+    for start, end in sorted(spans, reverse=True):
+        text = text[:start] + "[NAME]" + text[end:]
+
+    return text
 
 
 def mask_all(text: str) -> str:
