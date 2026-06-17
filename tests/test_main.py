@@ -1,10 +1,13 @@
+import os
+os.environ["API_KEY"] = "test-key-only-used-in-pytest"
+
 import io
 from fastapi.testclient import TestClient
 from app.main import app
 
 client = TestClient(app)
 
-HEADERS = {"X-API-Key": "supersecretkey123"}
+HEADERS = {"X-API-Key": "test-key-only-used-in-pytest"}
 
 
 # --- Health ---
