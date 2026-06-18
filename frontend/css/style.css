@@ -7,8 +7,8 @@
 
 body {
   font-family: 'Inter', system-ui, sans-serif;
-  background-color: #01192b; /* Самый темный синий для фона страницы */
-  color: #c2d1d9;            /* Светло-серый с синевой для базового текста */
+  background-color: #100f14; /* Noir Black — глубокий темный фон */
+  color: #dddee2;            /* Pearl Gray — базовый светлый текст */
   min-height: 100vh;
   display: flex;
   align-items: center;
@@ -35,33 +35,34 @@ body {
   font-size: 1.5rem;
   font-weight: 600;
   letter-spacing: -0.02em;
-  color: #e1e5e8; /* Самый светлый/белый для названия */
+  color: #dddee2; /* Pearl Gray — яркий заголовок */
 }
 
 .logo-accent {
-  color: #c2d1d9; /* Мягкий сине-серый акцент для слова Tool */
+  color: #98979f; /* Smoke Gray (светлый оттенок) — мягкий контраст для Tool */
 }
 
 .tagline {
   margin-top: 6px;
   font-size: 0.875rem;
-  color: #99abbb; /* Приглушенный синий для подзаголовка */
+  color: #98979f; /* Приглушенный серый для подзаголовка */
 }
 
 /* === Card === */
 .card {
-  background: #113f5c; /* Глубокий синий для карточек */
+  background: #5d5c66; /* Smoke Gray — карточка контрастно выделяется на фоне */
   border-radius: 16px;
   padding: 32px;
   display: flex;
   flex-direction: column;
   gap: 16px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3); /* Более глубокая тень для темной темы */
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5); /* Глубокая тень отделяет карточку от фона */
 }
 
 /* === Drop Zone === */
 .dropzone {
-  border: 1.5px dashed #436380; /* Четкая приглушенная граница */
+  border: 2px dashed #5b6976; /* Fog Blue — контрастная пунктирная граница в покое */
+  background-color: #100f14;  /* Внутренний фон зоны утоплен в Noir Black */
   border-radius: 12px;
   padding: 40px 24px;
   display: flex;
@@ -74,34 +75,34 @@ body {
 
 .dropzone:hover,
 .dropzone.dragover {
-  border-color: #c2d1d9;
-  background-color: #1c4b6b; /* Легкое высветление при наведении */
+  border-color: #dddee2;     /* При наведении граница загорается Pearl Gray */
+  background-color: #1a1921;  /* Легкий интерактивный отклик фона */
 }
 
 .dropzone-icon {
-  color: #436380;
+  color: #5b6976; /* Fog Blue для иконки в покое */
   transition: color 0.2s ease-in-out;
 }
 
 .dropzone:hover .dropzone-icon,
 .dropzone.dragover .dropzone-icon {
-  color: #c2d1d9;
+  color: #dddee2; /* При наведении иконка становится яркой */
 }
 
 .dropzone-text {
   font-size: 0.9375rem;
   font-weight: 500;
-  color: #e1e5e8; /* Яркий текст */
+  color: #dddee2; /* Pearl Gray для главного призыва */
 }
 
 .dropzone-subtext {
   font-size: 0.8125rem;
-  color: #99abbb; /* "or" между кнопкой и текстом */
+  color: #5b6976; /* Приглушенный Fog Blue для слова "or" */
 }
 
 .dropzone-hint {
   font-size: 0.75rem;
-  color: #e6e9ec; /* Текст .txt or .csv */
+  color: #98979f; /* Спокойный серый для ограничений по файлам */
   margin-top: 4px;
 }
 
@@ -110,15 +111,15 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
-  background: #042a44;
+  background: #100f14; /* Черный блок внутри серой карточки */
   border-radius: 8px;
   padding: 10px 14px;
   font-size: 0.875rem;
-  color: #c2d1d9;
+  color: #dddee2;
 }
 
 .file-info svg {
-  color: #c2d1d9;
+  color: #5b6976;
   flex-shrink: 0;
 }
 
@@ -133,7 +134,7 @@ body {
   background: none;
   border: none;
   cursor: pointer;
-  color: #436380;
+  color: #5b6976;
   font-size: 0.875rem;
   padding: 2px 4px;
   border-radius: 4px;
@@ -141,38 +142,40 @@ body {
 }
 
 .btn-clear:hover {
-  color: #e1e5e8;
+  color: #dddee2;
 }
 
 /* === Buttons === */
 .btn-primary {
   width: 100%;
   padding: 12px;
-  background-color: #c2d1d9; /* Светлая контрастная кнопка на темном фоне */
-  color: #042a44;            /* Темный читаемый текст на ней */
+  background-color: #dddee2; /* Полная инверсия: кнопка ярко-светлая */
+  color: #100f14;            /* Текст глубокий черный для максимального контраста */
   border: none;
   border-radius: 12px;
   font-family: inherit;
   font-size: 0.9375rem;
-  font-weight: 600;          /* Чуть добавил плотности для лучшей читаемости */
+  font-weight: 600;          
   cursor: pointer;
   transition: background-color 0.2s ease-in-out, opacity 0.2s ease-in-out;
 }
 
 .btn-primary:hover:not(:disabled) {
-  background-color: #e1e5e8; /* Становится еще ярче при наведении */
+  background-color: #ffffff; /* При наведении кнопка горит чистым белым */
 }
 
 .btn-primary:disabled {
-  opacity: 0.25; /* Сильнее приглушаем в темной теме, если неактивна */
+  background-color: #98979f; /* В неактивном состоянии кнопка тускнеет */
+  color: #5d5c66;
+  opacity: 0.4;
   cursor: not-allowed;
 }
 
 .btn-secondary {
   display: inline-block;
   padding: 8px 18px;
-  background-color: #436380; /* Кнопка "Browse file" стала темнее и заметнее */
-  color: #e1e5e8;            /* Контрастный текст на ней */
+  background-color: #5b6976; /* Спокойный Fog Blue для вторичной кнопки */
+  color: #dddee2;            /* Светлый читаемый текст */
   border-radius: 8px;
   font-family: inherit;
   font-size: 0.875rem;
@@ -182,7 +185,7 @@ body {
 }
 
 .btn-secondary:hover {
-  background-color: #517596; /* Эффект наведения */
+  background-color: #6c7d8c; /* Осветление при наведении */
 }
 
 /* === Status === */
@@ -191,32 +194,32 @@ body {
   align-items: center;
   gap: 10px;
   padding: 12px 16px;
-  background: #113f5c;
+  background: #100f14;
   border-radius: 12px;
   font-size: 0.875rem;
-  color: #c2d1d9;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  color: #dddee2;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
 .status-indicator {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background-color: #436380;
+  background-color: #5b6976;
   flex-shrink: 0;
 }
 
 .status-indicator.loading {
-  background-color: #c2d1d9;
+  background-color: #dddee2;
   animation: pulse 1.2s ease-in-out infinite;
 }
 
 .status-indicator.success {
-  background-color: #c2d1d9;
+  background-color: #a7f3d0; /* Мягкий мятно-зеленый для успеха */
 }
 
 .status-indicator.error {
-  background-color: #F87171; /* Оставляем стандартный красный для ошибок */
+  background-color: #f87171; /* Мягкий красный для ошибок */
 }
 
 @keyframes pulse {
@@ -226,10 +229,10 @@ body {
 
 /* === Info Panel === */
 .info-panel {
-  background: #113f5c;
+  background: #5d5c66; /* Точно такой же Smoke Gray, как у основной карточки */
   border-radius: 12px;
   padding: 20px 24px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
 }
 
 .info-title {
@@ -237,7 +240,7 @@ body {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: #99abbb; /* "WHAT GETS REMOVED" стал приглушенным синим */
+  color: #dddee2; /* Сделано ярким и читаемым */
   margin-bottom: 12px;
 }
 
@@ -254,27 +257,27 @@ body {
   align-items: center;
   gap: 8px;
   font-size: 0.875rem;
-  color: #c2d1d9;
+  color: #dddee2;
 }
 
 .info-item svg {
-  color: #dbe0e4;
+  color: #98979f;
   flex-shrink: 0;
 }
 
 .info-note {
   font-size: 0.75rem;
-  color: #99abbb; /* Текст "coming in v2" стал читаемым, но не отвлекает */
+  color: #98979f; /* "coming in v2" аккуратно приглушен */
   padding-top: 10px;
-  border-top: 1px solid #042a44; /* Разделительная линия теперь темная */
+  border-top: 1px solid #5b6976; /* Тонкая разделительная линия туманного цвета */
 }
 
 /* === Log Panel === */
 .log-panel {
-  background: #113f5c;
+  background: #100f14;
   border-radius: 12px;
   padding: 20px 24px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 }
 
 .log-title {
@@ -282,7 +285,7 @@ body {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: #436380;
+  color: #5b6976;
   margin-bottom: 12px;
 }
 
@@ -295,19 +298,19 @@ body {
 
 .log-item {
   font-size: 0.8125rem;
-  color: #c2d1d9;
+  color: #dddee2;
   padding: 6px 10px;
-  background: #042a44;
+  background: #1a1921;
   border-radius: 6px;
   font-family: 'SF Mono', 'Fira Code', monospace;
 }
 
 .log-item.success {
-  color: #c2d1d9;
+  color: #a7f3d0;
 }
 
 .log-item.error {
-  color: #F87171;
+  color: #f87171;
 }
 
 /* === Upload icon animation === */
@@ -331,7 +334,7 @@ body {
   align-items: flex-start;
   gap: 8px;
   font-size: 0.8125rem;
-  color: #94A3B8;
+  color: #dddee2; /* Pearl Gray для чекбокса и его условий безопасности */
   cursor: pointer;
   line-height: 1.4;
 }
