@@ -19,12 +19,12 @@ MAX_INPUT_LENGTH = 100_000
 
 # --- PII Patterns ---
 
-# EMAIL: Строгий паттерн без пробелов вокруг @
+# EMAIL: 
 EMAIL_PATTERN = re.compile(
     r'(?<![a-zA-Z0-9._%+\-])'
     r'(?!\S*\.\.)'
     r'[a-zA-Z0-9._%+\-]+'
-    r'@'
+    r'\s*@\s*'
     r'[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}'
     r'(?=[^a-zA-Z0-9]|$)',
     re.IGNORECASE
@@ -94,7 +94,7 @@ def _mask_entities(text: str, allowed_labels: set[str]) -> str:
 
         # Корректировка границ NER: удаляем случайно захваченные начальные глаголы/предлоги
         for token in ent:
-            if token.pos_ in {"VERB", "ADP"} or token.text.lower() in {"call", "write", "email", "contact", "to"}:
+            if token.text.lower() in {"call", "write", "email", "contact", "to"}:
                 # Сдвигаем начало маски за пределы этого токена
                 start_char = token.idx + len(token.text)
                 # Пропускаем пробелы после очищенного слова
