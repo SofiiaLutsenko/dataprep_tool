@@ -123,10 +123,14 @@ def _mask_entities(text: str, allowed_labels: set[str]) -> str:
 def mask_names(text: str) -> str:
     return _mask_entities(text, {"PERSON"})
 
+def mask_orgs(text: str) -> str:
+    return _mask_entities(text, {"ORG"})
+
 
 def mask_all(text: str) -> str:
     text = _validate_input(text)
     text = mask_emails(text)
     text = mask_phones(text)
     text = mask_names(text) # Теперь имена точно маскируются
+    text = mask_orgs(text)
     return text
