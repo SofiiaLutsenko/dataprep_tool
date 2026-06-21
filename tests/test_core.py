@@ -190,3 +190,69 @@ def test_no_names_in_text():
     result = mask_names("This document contains no personal names.")
     assert "[NAME]" not in result
     
+# --- Phone: date range false positives (regression) ---
+
+def test_phone_year_range_with_spaces_not_masked():
+    result = mask_phones("Tenure: 2019 - 2021")
+    assert "[PHONE]" not in result
+    assert "2019 - 2021" in result
+
+def test_phone_year_range_no_spaces_not_masked():
+    result = mask_phones("Tenure: 2019-2021")
+    assert "[PHONE]" not in result
+    assert "2019-2021" in result
+
+def test_phone_year_range_in_parens_not_masked():
+    result = mask_phones("Technical University of Munich (2019 - 2021)")
+    assert "[PHONE]" not in result
+    assert "(2019 - 2021)" in result
+
+def test_phone_year_range_does_not_corrupt_org_ner():
+    # Regression test for the cascade: the [PHONE] placeholder was breaking
+    # spaCy's token window, causing the adjacent ORG entity to go undetected.
+    result = mask_all("Technical University of Munich (2019 - 2021)")
+    assert "[PHONE]" not in result
+    assert "Technical University of Munich" not in result
+    assert "[ORG]" in result
+
+def test_phone_year_range_does_not_corrupt_mit_acronym_case():
+    result = mask_all("Massachusetts Institute of Technology (MIT) (2016 - 2019)")
+    assert "[PHONE]" not in result
+    assert "Massachusetts Institute of Technology" not in result
+
+def test_phone_real_number_with_year_like_prefix_still_masked():
+    # The exemption is anchored to the FULL match, so a real number carrying
+    # a country code must never be exempted just because its digits start
+    # with 19/20.
+    assert "[PHONE]" in mask_phones("+49 1995 234 567")
+
+def test_phone_eight_digit_grouped_number_still_masked():
+    # Not year-shaped -> exemption must not apply.
+    assert "[PHONE]" in mask_phones("Call 5512-8847 now")
+    
+# --- Sentence boundary forcing (line isolation for NER) ---
+
+def test_force_line_sentence_boundaries_marks_token_after_newline():
+    import spacy
+    from app.core import _force_line_sentence_boundaries
+    nlp = spacy.blank("en")
+    doc = nlp("CERTIFICATIONS & SKILLS\n- Certified AWS Solutions Architect")
+    doc = _force_line_sentence_boundaries(doc)
+    dash_token = next(t for t in doc if t.text == "-")
+    assert dash_token.is_sent_start is True
+
+def test_force_line_sentence_boundaries_handles_crlf_and_blank_lines():
+    import spacy
+    from app.core import _force_line_sentence_boundaries
+    nlp = spacy.blank("en")
+    for text in ["a\r\nb", "a\n\nb"]:
+        doc = _force_line_sentence_boundaries(nlp(text))
+        assert doc[-1].text == "b"
+        assert doc[-1].is_sent_start is True
+        
+def test_section_header_does_not_fuse_with_bullet_into_single_org():
+    text = "CERTIFICATIONS & SKILLS\n- Certified AWS Solutions Architect (Terraform, Kubernetes)"
+    result = mask_all(text)
+    assert "CERTIFICATIONS & SKILLS" in result
+    assert "Terraform" in result
+    assert "Kubernetes" in result
