@@ -1,7 +1,13 @@
 import pytest
-from app.core import mask_emails, mask_phones, mask_all, MAX_INPUT_LENGTH
-from app.core import mask_names
-
+from app.core import (
+    mask_emails, 
+    mask_phones, 
+    mask_names, 
+    mask_orgs, 
+    mask_locations, 
+    mask_all, 
+    MAX_INPUT_LENGTH
+)
 
 # --- Validation ---
 
@@ -162,6 +168,7 @@ def test_ip_based_email_known_limitation():
     result = mask_all("Contact root@123.45.67.78 for access")
     assert result is not None
 
+
 # --- Names: NER masking ---
 
 def test_mask_full_name():
@@ -190,6 +197,7 @@ def test_no_names_in_text():
     result = mask_names("This document contains no personal names.")
     assert "[NAME]" not in result
     
+
 # --- Phone: date range false positives (regression) ---
 
 def test_phone_year_range_with_spaces_not_masked():
@@ -220,6 +228,7 @@ def test_phone_year_range_does_not_corrupt_mit_acronym_case():
     assert "[PHONE]" not in result
     assert "Massachusetts Institute of Technology" not in result
 
+
 def test_phone_real_number_with_year_like_prefix_still_masked():
     # The exemption is anchored to the FULL match, so a real number carrying
     # a country code must never be exempted just because its digits start
@@ -230,6 +239,7 @@ def test_phone_eight_digit_grouped_number_still_masked():
     # Not year-shaped -> exemption must not apply.
     assert "[PHONE]" in mask_phones("Call 5512-8847 now")
     
+
 # --- Sentence boundary forcing (line isolation for NER) ---
 
 def test_force_line_sentence_boundaries_marks_token_after_newline():
@@ -256,3 +266,92 @@ def test_section_header_does_not_fuse_with_bullet_into_single_org():
     assert "CERTIFICATIONS & SKILLS" in result
     assert "Terraform" in result
     assert "Kubernetes" in result
+
+
+# --- Locations: NER True Positives (Phase 1.2) ---
+
+def test_mask_city_simple():
+    result = mask_locations("I live in Berlin.")
+    assert "[LOCATION]" in result
+    assert "Berlin" not in result
+
+def test_mask_country_only():
+    result = mask_locations("Originally from Ukraine.")
+    assert "[LOCATION]" in result
+    assert "Ukraine" not in result
+
+def test_mask_city_and_country():
+    result = mask_locations("Relocating to Berlin, Germany.")
+    assert "[LOCATION]" in result
+    assert "Berlin" not in result
+    assert "Germany" not in result
+
+def test_mask_remote_mention():
+    result = mask_locations("Working remotely from Lisbon.")
+    assert "[LOCATION]" in result
+    assert "Lisbon" not in result
+
+def test_mask_us_city():
+    result = mask_locations("Based in San Francisco.")
+    assert "[LOCATION]" in result
+    assert "San Francisco" not in result
+
+
+# --- Locations: Street Address Regex ---
+
+def test_mask_street_address_standard():
+    result = mask_locations("Address: 123 Main Street.")
+    assert "[LOCATION]" in result
+    assert "123 Main Street" not in result
+
+def test_mask_street_address_abbreviation():
+    result = mask_locations("She lives at 456 Oak Ave.")
+    assert "[LOCATION]" in result
+    assert "456 Oak Ave" not in result
+
+
+# --- Locations: Whitelist False Positive Verification ---
+
+def test_terraform_not_masked_as_location():
+    # Regression: Terraform documented as GPE false positive in small model.
+    # Verifies 'terraform' was successfully added to SKILL_WHITELIST.
+    result = mask_locations("Infrastructure managed via Terraform.")
+    assert "[LOCATION]" not in result
+    assert "Terraform" in result
+
+def test_node_js_not_masked_as_location():
+    # Regression: "Node.js" misclassified as location/GPE boundary.
+    result = mask_locations("Backend built with Node.js and Express.")
+    assert "[LOCATION]" not in result
+    assert "Node.js" in result
+
+def test_react_not_masked_as_location():
+    result = mask_locations("Frontend in React and Angular.")
+    assert "[LOCATION]" not in result
+    assert "React" in result
+
+def test_docker_not_masked_as_location():
+    result = mask_locations("Containerized with Docker.")
+    assert "[LOCATION]" not in result
+    assert "Docker" in result
+
+def test_no_location_no_mask():
+    result = mask_locations("I build Python APIs using FastAPI and Redis.")
+    assert "[LOCATION]" not in result
+
+
+# --- Locations: mask_all Integration Tests ---
+
+def test_mask_all_location_with_name():
+    result = mask_all("John Smith is relocating to Munich.")
+    assert "[NAME]" in result
+    assert "[LOCATION]" in result
+    assert "John Smith" not in result
+    assert "Munich" not in result
+
+def test_mask_all_location_with_org():
+    result = mask_all("Software Engineer at Google in Munich.")
+    assert "[ORG]" in result
+    assert "[LOCATION]" in result
+    assert "Google" not in result
+    assert "Munich" not in result

@@ -45,9 +45,8 @@ SKILL_WHITELIST = {
     "aws", "azure", "git", "github", "gitlab", "linux", "windows", "mongodb",
     "postgresql", "mysql", "redis", "graphql", "rest", "html", "css", "sql",
     "swift", "kotlin", "golang", "rust", "scala", "ruby", "php", "c++", "c#",
-    "computer science", "data science", "machine learning", "machine learning", "certifications & skills",
-    "professional experience",
-    "education"
+    "computer science", "data science", "machine learning", "certifications & skills",
+    "professional experience", "education", "terraform", "node.js"
 }
 
 MAX_INPUT_LENGTH = 100_000
@@ -94,6 +93,21 @@ PHONE_PATTERN = re.compile(
 # negatives — it can only exempt things that were never phone numbers.
 PHONE_YEAR_RANGE_PATTERN = re.compile(r'^(?:19|20)\d{2}\s*-\s*(?:19|20)\d{2}$')
 
+# STREET ADDRESS: number + 1-3 word street name + known suffix
+# spaCy NER (en_core_web_sm) is unreliable on addresses; regex is the fallback.
+# Scope: US/UK format (number-first). German format (Musterstraße 12) is not
+# reliably catchable via regex without unacceptable false-positive risk on
+# any "Word <number>" pattern -- intentionally out of scope.
+STREET_ADDRESS_PATTERN = re.compile(
+    r'\b\d{1,5}'
+    r'\s+'
+    r'(?:[A-Za-z]+\s+){1,3}'
+    r'(?:Street|St|Avenue|Ave|Road|Rd|Boulevard|Blvd|Drive|Dr|'
+    r'Lane|Ln|Way|Court|Ct|Place|Pl|Square|Sq)'
+    r'\.?'
+    r'(?=[\s,.]|$)',
+    re.IGNORECASE
+)
 
 # --- Validation ---
 
@@ -114,11 +128,19 @@ def mask_emails(text: str) -> str:
     text = EMAIL_PATTERN.sub('[EMAIL]', text)
     return text
 
+def mask_phones(text: str) -> str:
+    def _replace(match: re.Match) -> str:
+        matched = match.group(0)
+        if PHONE_YEAR_RANGE_PATTERN.match(matched):
+            return matched  # bare year range (e.g. resume dates), not a phone number
+        return '[PHONE]'
+    return PHONE_PATTERN.sub(_replace, text)
+
 
 def _mask_entities(text: str, allowed_labels: set[str]) -> str:
     """Generic entity masking helper. Replaces entities whose label is in
     allowed_labels with [LABEL], skipping anything in the skill whitelist.
-    Включает пост-обработку для защиты ошибочно захваченных глаголов."""
+    Includes post-processing to protect erroneously captured verbs."""
     doc = _nlp(text)
     spans = []
 
@@ -131,28 +153,36 @@ def _mask_entities(text: str, allowed_labels: set[str]) -> str:
         start_char = ent.start_char
         end_char = ent.end_char
 
-        # Корректировка границ NER: удаляем случайно захваченные начальные глаголы/предлоги
+        # NER boundary correction: strip out accidentally captured leading verbs/prepositions
         for token in ent:
             if token.text.lower() in {"call", "write", "email", "contact", "to", "copy", "paste", "upload", "verify", "enter"}:
-                # Сдвигаем начало маски за пределы этого токена
+                # Shift the start of the mask past this token
                 start_char = token.idx + len(token.text)
-                # Пропускаем пробелы после очищенного слова
+                # Skip whitespace after the cleaned word
                 while start_char < len(text) and text[start_char].isspace():
                     start_char += 1
             else:
-                # Как только дошли до реального имени (NOUN/PROPN) — останавливаемся
+                # Stop as soon as we hit the actual name (NOUN/PROPN)
                 break
 
         if start_char < end_char:
             spans.append((start_char, end_char, ent.label_))
 
-    # Безопасная замена с конца строки с защитой от наложений
+    # Safe replacement from the end of the string to prevent overlap
     last_start = len(text) + 1
+    
+    _PLACEHOLDER = {
+        "PERSON": "[NAME]", 
+        "GPE": "[LOCATION]", 
+        "LOC": "[LOCATION]",
+        "ORG": "[ORG]"
+    }
+    
     for start, end, label in sorted(spans, key=lambda x: x[0], reverse=True):
         if end > last_start:
             continue
         
-        placeholder = f"[{label}]" if label != "PERSON" else "[NAME]"
+        placeholder = _PLACEHOLDER.get(label, f"[{label}]")
         text = text[:start] + placeholder + text[end:]
         last_start = start
 
@@ -165,19 +195,19 @@ def mask_names(text: str) -> str:
 def mask_orgs(text: str) -> str:
     return _mask_entities(text, {"ORG"})
 
+def mask_locations(text: str) -> str:
+    # Regex first: catches street addresses (spaCy misses these reliably).
+    # NER second: catches cities, countries, regions (GPE + LOC labels).
+    # Same ordering rationale as email/phone before NER -- placeholders
+    # already in the text won't be re-classified as entities.
+    text = STREET_ADDRESS_PATTERN.sub("[LOCATION]", text)
+    return _mask_entities(text, {"GPE", "LOC"})
 
 def mask_all(text: str) -> str:
     text = _validate_input(text)
     text = mask_emails(text)
     text = mask_phones(text)
-    text = mask_names(text) # Теперь имена точно маскируются
+    text = mask_names(text)
     text = mask_orgs(text)
+    text = mask_locations(text)
     return text
-
-def mask_phones(text: str) -> str:
-    def _replace(match: re.Match) -> str:
-        matched = match.group(0)
-        if PHONE_YEAR_RANGE_PATTERN.match(matched):
-            return matched  # bare year range (e.g. resume dates), not a phone number
-        return '[PHONE]'
-    return PHONE_PATTERN.sub(_replace, text)
