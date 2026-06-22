@@ -85,19 +85,10 @@ PHONE_PATTERN = re.compile(
     r'(?:[\s\-]?(?:ext\.?|x)\s*\d{1,5})?'
 )
 
-# YEAR RANGE FALSE POSITIVE: checked against the FULL phone match, not the
-# raw input text. A match can only equal this shape if it carries no
-# country code, no area-code parens, and no extension — structurally it's
-# nothing but two bare 19xx/20xx numbers joined by a hyphen. A real phone
-# number can never satisfy this anchor, so this cannot introduce new false
-# negatives — it can only exempt things that were never phone numbers.
+# YEAR RANGE FALSE POSITIVE: checked against the FULL phone match.
 PHONE_YEAR_RANGE_PATTERN = re.compile(r'^(?:19|20)\d{2}\s*-\s*(?:19|20)\d{2}$')
 
 # STREET ADDRESS: number + 1-3 word street name + known suffix
-# spaCy NER (en_core_web_sm) is unreliable on addresses; regex is the fallback.
-# Scope: US/UK format (number-first). German format (Musterstraße 12) is not
-# reliably catchable via regex without unacceptable false-positive risk on
-# any "Word <number>" pattern -- intentionally out of scope.
 STREET_ADDRESS_PATTERN = re.compile(
     r'\b\d{1,5}'
     r'\s+'
@@ -108,6 +99,59 @@ STREET_ADDRESS_PATTERN = re.compile(
     r'(?=[\s,.]|$)',
     re.IGNORECASE
 )
+
+# --- Date / Age Patterns (Phase 1.3 Hardened) ---
+
+# Secure separator handling optional colons/dashes and whitespace variables on BOTH sides
+_TRIGGER_SEP = r'(?:\s*[:,\-–—]\s*|\s+)'
+
+# Appended optional periods `\.?` to explicitly capture standard US prose abbreviations ("Jan.", "Feb.")
+_MONTH_NAMES = (
+    r'(?:January|February|March|April|May|June|July|August|September|'
+    r'October|November|December|'
+    r'Jan\.?|Feb\.?|Mar\.?|Apr\.?|Jun\.?|Jul\.?|Aug\.?|Sep\.?|Oct\.?|Nov\.?|Dec\.?)'
+)
+
+_ORD = r'(?:st|nd|rd|th)?'
+
+# All branches require a 4-digit year to cleanly decouple from experience ranges like "2019-2022"
+_DATE_VALUE = (
+    r'(?:'
+    r'\d{4}-\d{2}-\d{2}'                                          # 1. ISO (YYYY-MM-DD)
+    r'|\d{1,2}\.\d{1,2}\.\d{4}'                                   # 2. DD.MM.YYYY
+    r'|\d{1,2}/\d{1,2}/\d{4}'                                     # 3. MM/DD/YYYY
+    r'|' + _MONTH_NAMES + r'\s+\d{1,2}' + _ORD + r',?\s*\d{4}'   # 4. Month DD, YYYY
+    r'|\d{1,2}' + _ORD + r'\s+' + _MONTH_NAMES + r'\s+\d{4}'      # 5. DD Month YYYY
+    r')'
+)
+
+# Matches a DOB trigger label followed directly by a validated date value format
+DOB_PATTERN = re.compile(
+    r'(?P<trigger>'
+    r'(?:born|d\.o\.b\.?|dob|date\s+of\s+birth|birthd(?:ay|ate))'
+    + _TRIGGER_SEP +
+    r')'
+    r'(?P<date>' + _DATE_VALUE + r')',
+    re.IGNORECASE,
+)
+
+# Matches explicit labels including spaces or missing colons ("Age 34")
+AGE_LABEL_PATTERN = re.compile(
+    r'(?P<trigger>\bage\s*(?::\s*|\s+))'
+    r'(?P<age>\d{1,3})'
+    r'(?!\.\d)'  # Защита: не маскируем целую часть флоатов (например, Age: 25.5)
+    r'(?=\s*(?:years?)?(?:\s+old)?\b|\s|$)',
+    re.IGNORECASE,
+)
+
+# Matches the trailing descriptive age layout ("34 years old", "28-year-old")
+AGE_TRAILING_PATTERN = re.compile(
+    r'(?<!\.)'  # Защита: не маскируем дробную часть флоатов (например, 25.5 years old)
+    r'(?P<age>\d{1,3})'
+    r'(?P<suffix>[ \t]*-?years?[ \t]*-?old)',
+    re.IGNORECASE,
+)
+
 
 # --- Validation ---
 
@@ -132,15 +176,14 @@ def mask_phones(text: str) -> str:
     def _replace(match: re.Match) -> str:
         matched = match.group(0)
         if PHONE_YEAR_RANGE_PATTERN.match(matched):
-            return matched  # bare year range (e.g. resume dates), not a phone number
+            return matched
         return '[PHONE]'
     return PHONE_PATTERN.sub(_replace, text)
 
 
 def _mask_entities(text: str, allowed_labels: set[str]) -> str:
     """Generic entity masking helper. Replaces entities whose label is in
-    allowed_labels with [LABEL], skipping anything in the skill whitelist.
-    Includes post-processing to protect erroneously captured verbs."""
+    allowed_labels with [LABEL], skipping anything in the skill whitelist."""
     doc = _nlp(text)
     spans = []
 
@@ -156,19 +199,15 @@ def _mask_entities(text: str, allowed_labels: set[str]) -> str:
         # NER boundary correction: strip out accidentally captured leading verbs/prepositions
         for token in ent:
             if token.text.lower() in {"call", "write", "email", "contact", "to", "copy", "paste", "upload", "verify", "enter"}:
-                # Shift the start of the mask past this token
                 start_char = token.idx + len(token.text)
-                # Skip whitespace after the cleaned word
                 while start_char < len(text) and text[start_char].isspace():
                     start_char += 1
             else:
-                # Stop as soon as we hit the actual name (NOUN/PROPN)
                 break
 
         if start_char < end_char:
             spans.append((start_char, end_char, ent.label_))
 
-    # Safe replacement from the end of the string to prevent overlap
     last_start = len(text) + 1
     
     _PLACEHOLDER = {
@@ -196,15 +235,50 @@ def mask_orgs(text: str) -> str:
     return _mask_entities(text, {"ORG"})
 
 def mask_locations(text: str) -> str:
-    # Regex first: catches street addresses (spaCy misses these reliably).
-    # NER second: catches cities, countries, regions (GPE + LOC labels).
-    # Same ordering rationale as email/phone before NER -- placeholders
-    # already in the text won't be re-classified as entities.
     text = STREET_ADDRESS_PATTERN.sub("[LOCATION]", text)
     return _mask_entities(text, {"GPE", "LOC"})
 
-def mask_all(text: str) -> str:
+
+def mask_dates(text: str) -> str:
+    """
+    Masks dates of birth and explicit age declarations using deterministic regex.
+    Protects employment duration records and baseline framework terms.
+    """
+    # 1. DOB label + date value (label preserved)
+    def _replace_dob(m: re.Match) -> str:
+        return m.group('trigger') + '[DATE]'
+
+    text = DOB_PATTERN.sub(_replace_dob, text)
+
+    # 2. Age label — Evaluates a realistic upper limit of 120 years to isolate data
+    def _replace_age_label(m: re.Match) -> str:
+        try:
+            if int(m.group('age')) <= 120:
+                return m.group('trigger') + '[DATE]'
+        except ValueError:
+            pass
+        return m.group(0)
+
+    text = AGE_LABEL_PATTERN.sub(_replace_age_label, text)
+
+    # 3. Trailing "N years old" / "N-year-old" (suffix context preserved)
+    def _replace_age_trailing(m: re.Match) -> str:
+        try:
+            if int(m.group('age')) <= 120:
+                return '[DATE]' + m.group('suffix')
+        except ValueError:
+            pass
+        return m.group(0)
+
+    text = AGE_TRAILING_PATTERN.sub(_replace_age_trailing, text)
+
+    return text
+
+
+def mask_all(text: str, mask_dob: bool = True) -> str:
     text = _validate_input(text)
+    if mask_dob:
+        text = mask_dates(text)  # Запускаем ПЕРВЫМ, чтобы защитить даты от маски телефонов и NER
     text = mask_emails(text)
     text = mask_phones(text)
     text = mask_names(text)
