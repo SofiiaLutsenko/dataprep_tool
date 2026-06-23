@@ -81,7 +81,7 @@ class TextResponse(BaseModel):
 
 ALLOWED_EXTENSIONS = {".txt", ".csv"}
 CSV_INJECTION_CHARS = ("=", "@", "+", "-")
-MAX_FILE_BYTES = 99_000  # aligned with MAX_INPUT_LENGTH in core.py (~100KB)
+MAX_FILE_BYTES = 30_000  # aligned with MAX_INPUT_LENGTH in core.py (~30KB)
 
 
 def _is_utf8_text_content(data: bytes) -> bool:
@@ -131,7 +131,7 @@ def health_check():
 
 
 @app.post("/api/v1/mask/text", response_model=TextResponse)
-@limiter.limit("30/minute")
+@limiter.limit("10/minute")
 def mask_text(request: Request, body: TextRequest):
     try:
         result = mask_all(body.text)
@@ -148,7 +148,7 @@ def mask_text(request: Request, body: TextRequest):
 
 
 @app.post("/api/v1/mask/file")
-@limiter.limit("5/minute")
+@limiter.limit("3/minute")
 async def mask_file(request: Request, file: UploadFile = File(...)):
     # Validate extension
     filename = file.filename or "upload"

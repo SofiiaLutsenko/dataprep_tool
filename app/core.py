@@ -49,7 +49,7 @@ SKILL_WHITELIST = {
     "professional experience", "education", "terraform", "node.js"
 }
 
-MAX_INPUT_LENGTH = 100_000
+MAX_INPUT_LENGTH = 30_000  # 30 KB
 
 # --- PII Patterns ---
 
