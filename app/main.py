@@ -4,7 +4,7 @@ import logging
 import urllib.parse
 
 import anyio
-from fastapi import Depends, FastAPI, File, HTTPException, Request, UploadFile
+from fastapi import Depends, FastAPI, File, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from fastapi.security import APIKeyHeader
@@ -54,8 +54,9 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
-    allow_methods=["POST", "GET"],
+    allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
+    allow_credentials=True,
 )
 
 
@@ -81,7 +82,7 @@ class TextResponse(BaseModel):
 
 ALLOWED_EXTENSIONS = {".txt", ".csv"}
 CSV_INJECTION_CHARS = ("=", "@", "+", "-")
-MAX_FILE_BYTES = 99_000  # aligned with MAX_INPUT_LENGTH in core.py (~100KB)
+MAX_FILE_BYTES = 30_000  # aligned with MAX_INPUT_LENGTH in core.py (~30KB)
 
 
 def _is_utf8_text_content(data: bytes) -> bool:
@@ -129,12 +130,15 @@ def _sanitize_csv(text: str) -> str:
 def health_check():
     return {"status": "ok"}
 
-
 @app.post("/api/v1/mask/text", response_model=TextResponse)
-@limiter.limit("30/minute")
-def mask_text(request: Request, body: TextRequest):
+@limiter.limit("10/minute")
+def mask_text(
+    request: Request,
+    body: TextRequest,
+    mode: str = Query("full", pattern="^(fast|full)$")
+):
     try:
-        result = mask_all(body.text)
+        result = mask_all(body.text, mode=mode)
         return TextResponse(
             masked_text=result,
             chars_processed=len(body.text)
@@ -146,10 +150,14 @@ def mask_text(request: Request, body: TextRequest):
         logger.warning("Invalid input value received")
         raise HTTPException(status_code=400, detail="Invalid input data")
 
-
 @app.post("/api/v1/mask/file")
-@limiter.limit("5/minute")
-async def mask_file(request: Request, file: UploadFile = File(...)):
+@limiter.limit("3/minute")
+async def mask_file(
+    request: Request,
+    file: UploadFile = File(...),
+    mode: str = Query("full", pattern="^(fast|full)$")
+):
+
     # Validate extension
     filename = file.filename or "upload"
     ext = "." + filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
@@ -166,7 +174,7 @@ async def mask_file(request: Request, file: UploadFile = File(...)):
     if not _is_utf8_text_content(content):
         raise HTTPException(
             status_code=422,
-            detail="File appears to be binary or non-UTF-8 encoded. Please upload a UTF-8 encoded file"
+            detail="File appears to be binary or non-UTF-8 encoded."
         )
 
     # Decode
@@ -184,7 +192,8 @@ async def mask_file(request: Request, file: UploadFile = File(...)):
 
     # Mask — run in thread pool to avoid blocking event loop
     try:
-        masked = await anyio.to_thread.run_sync(mask_all, text)
+        # Pass the mode parameter to the core logic via thread pool
+        masked = await anyio.to_thread.run_sync(mask_all, text, mode)
     except ValueError:
         logger.warning("File content validation failed")
         raise HTTPException(status_code=400, detail="Invalid file content")

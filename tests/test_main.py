@@ -5,6 +5,8 @@ import io
 from fastapi.testclient import TestClient
 from app.main import app
 
+app.state.limiter.enabled = False
+
 client = TestClient(app)
 
 HEADERS = {"X-API-Key": "test-key-only-used-in-pytest"}
@@ -46,7 +48,7 @@ def test_mask_text_empty():
 def test_mask_text_too_large():
     response = client.post(
         "/api/v1/mask/text",
-        json={"text": "a" * 100_001},
+        json={"text": "a" * 30_001},
         headers=HEADERS
     )
     assert response.status_code == 422

@@ -7,8 +7,8 @@
 
 body {
   font-family: 'Inter', system-ui, sans-serif;
-  background-color: #100f14; /* Noir Black — глубокий темный фон */
-  color: #dddee2;            /* Pearl Gray — базовый светлый текст */
+  background-color: #f1f5f9; /* Светлый Slate фон */
+  color: #334155;            /* Темный текст для читаемости */
   min-height: 100vh;
   display: flex;
   align-items: center;
@@ -35,34 +35,62 @@ body {
   font-size: 1.5rem;
   font-weight: 600;
   letter-spacing: -0.02em;
-  color: #dddee2; /* Pearl Gray — яркий заголовок */
+  color: #1e293b;
 }
 
 .logo-accent {
-  color: #98979f; /* Smoke Gray (светлый оттенок) — мягкий контраст для Tool */
+  color: #64748b;
 }
 
 .tagline {
   margin-top: 6px;
   font-size: 0.875rem;
-  color: #98979f; /* Приглушенный серый для подзаголовка */
+  color: #64748b;
 }
 
 /* === Card === */
 .card {
-  background: #5d5c66; /* Smoke Gray — карточка контрастно выделяется на фоне */
+  background: #ffffff;
   border-radius: 16px;
   padding: 32px;
   display: flex;
   flex-direction: column;
   gap: 16px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5); /* Глубокая тень отделяет карточку от фона */
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+  border: 1px solid #e2e8f0;
+}
+
+/* === Mode Selector === */
+.mode-selector {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.mode-option {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.8125rem;
+  transition: all 0.2s;
+  background: #f8fafc;
+}
+
+.mode-option:has(input:checked) {
+  border-color: #334155;
+  background: #e2e8f0;
+  font-weight: 500;
 }
 
 /* === Drop Zone === */
 .dropzone {
-  border: 2px dashed #5b6976; /* Fog Blue — контрастная пунктирная граница в покое */
-  background-color: #100f14;  /* Внутренний фон зоны утоплен в Noir Black */
+  border: 2px dashed #cbd5e1;
+  background-color: #f8fafc;
   border-radius: 12px;
   padding: 40px 24px;
   display: flex;
@@ -70,277 +98,71 @@ body {
   align-items: center;
   gap: 8px;
   cursor: pointer;
-  transition: border-color 0.2s ease-in-out, background-color 0.2s ease-in-out;
+  transition: border-color 0.2s ease;
 }
 
-.dropzone:hover,
-.dropzone.dragover {
-  border-color: #dddee2;     /* При наведении граница загорается Pearl Gray */
-  background-color: #1a1921;  /* Легкий интерактивный отклик фона */
+.dropzone:hover, .dropzone.dragover {
+  border-color: #64748b;
+  background-color: #f1f5f9;
 }
 
-.dropzone-icon {
-  color: #5b6976; /* Fog Blue для иконки в покое */
-  transition: color 0.2s ease-in-out;
-}
+.dropzone-icon { color: #94a3b8; }
+.dropzone:hover .dropzone-icon { color: #334155; }
 
-.dropzone:hover .dropzone-icon,
-.dropzone.dragover .dropzone-icon {
-  color: #dddee2; /* При наведении иконка становится яркой */
-}
-
-.dropzone-text {
-  font-size: 0.9375rem;
-  font-weight: 500;
-  color: #dddee2; /* Pearl Gray для главного призыва */
-}
-
-.dropzone-subtext {
-  font-size: 0.8125rem;
-  color: #5b6976; /* Приглушенный Fog Blue для слова "or" */
-}
-
-.dropzone-hint {
-  font-size: 0.75rem;
-  color: #98979f; /* Спокойный серый для ограничений по файлам */
-  margin-top: 4px;
-}
+.dropzone-text { font-size: 0.9375rem; font-weight: 500; color: #1e293b; }
+.dropzone-subtext { font-size: 0.8125rem; color: #94a3b8; }
+.dropzone-hint { font-size: 0.75rem; color: #64748b; margin-top: 4px; }
 
 /* === File Info === */
 .file-info {
   display: flex;
   align-items: center;
   gap: 8px;
-  background: #100f14; /* Черный блок внутри серой карточки */
+  background: #f1f5f9;
   border-radius: 8px;
   padding: 10px 14px;
   font-size: 0.875rem;
-  color: #dddee2;
+  color: #334155;
 }
 
-.file-info svg {
-  color: #5b6976;
-  flex-shrink: 0;
-}
-
-#file-name {
-  flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.btn-clear {
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: #5b6976;
-  font-size: 0.875rem;
-  padding: 2px 4px;
-  border-radius: 4px;
-  transition: color 0.2s ease-in-out;
-}
-
-.btn-clear:hover {
-  color: #dddee2;
-}
+.btn-clear { background: none; border: none; cursor: pointer; color: #94a3b8; }
+.btn-clear:hover { color: #1e293b; }
 
 /* === Buttons === */
 .btn-primary {
   width: 100%;
   padding: 12px;
-  background-color: #dddee2; /* Полная инверсия: кнопка ярко-светлая */
-  color: #100f14;            /* Текст глубокий черный для максимального контраста */
+  background-color: #1e293b;
+  color: #ffffff;
   border: none;
   border-radius: 12px;
-  font-family: inherit;
   font-size: 0.9375rem;
-  font-weight: 600;          
+  font-weight: 600;
   cursor: pointer;
-  transition: background-color 0.2s ease-in-out, opacity 0.2s ease-in-out;
+  transition: background-color 0.2s;
 }
 
-.btn-primary:hover:not(:disabled) {
-  background-color: #ffffff; /* При наведении кнопка горит чистым белым */
-}
-
-.btn-primary:disabled {
-  background-color: #98979f; /* В неактивном состоянии кнопка тускнеет */
-  color: #5d5c66;
-  opacity: 0.4;
-  cursor: not-allowed;
-}
+.btn-primary:hover:not(:disabled) { background-color: #334155; }
+.btn-primary:disabled { background-color: #cbd5e1; cursor: not-allowed; }
 
 .btn-secondary {
   display: inline-block;
   padding: 8px 18px;
-  background-color: #5b6976; /* Спокойный Fog Blue для вторичной кнопки */
-  color: #dddee2;            /* Светлый читаемый текст */
+  background-color: #e2e8f0;
+  color: #334155;
   border-radius: 8px;
-  font-family: inherit;
   font-size: 0.875rem;
-  font-weight: 500;
   cursor: pointer;
-  transition: background-color 0.2s ease-in-out;
 }
 
-.btn-secondary:hover {
-  background-color: #6c7d8c; /* Осветление при наведении */
-}
+/* === Info Panel & Logs === */
+.info-panel { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px 24px; }
+.info-title, .log-title { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: #64748b; margin-bottom: 12px; }
+.info-item { font-size: 0.875rem; color: #334155; }
 
-/* === Status === */
-.status {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 16px;
-  background: #100f14;
-  border-radius: 12px;
-  font-size: 0.875rem;
-  color: #dddee2;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-}
-
-.status-indicator {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background-color: #5b6976;
-  flex-shrink: 0;
-}
-
-.status-indicator.loading {
-  background-color: #dddee2;
-  animation: pulse 1.2s ease-in-out infinite;
-}
-
-.status-indicator.success {
-  background-color: #a7f3d0; /* Мягкий мятно-зеленый для успеха */
-}
-
-.status-indicator.error {
-  background-color: #f87171; /* Мягкий красный для ошибок */
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.3; }
-}
-
-/* === Info Panel === */
-.info-panel {
-  background: #5d5c66; /* Точно такой же Smoke Gray, как у основной карточки */
-  border-radius: 12px;
-  padding: 20px 24px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
-}
-
-.info-title {
-  font-size: 0.75rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: #dddee2; /* Сделано ярким и читаемым */
-  margin-bottom: 12px;
-}
-
-.info-list {
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
-.info-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 0.875rem;
-  color: #dddee2;
-}
-
-.info-item svg {
-  color: #98979f;
-  flex-shrink: 0;
-}
-
-.info-note {
-  font-size: 0.75rem;
-  color: #98979f; /* "coming in v2" аккуратно приглушен */
-  padding-top: 10px;
-  border-top: 1px solid #5b6976; /* Тонкая разделительная линия туманного цвета */
-}
-
-/* === Log Panel === */
-.log-panel {
-  background: #100f14;
-  border-radius: 12px;
-  padding: 20px 24px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-}
-
-.log-title {
-  font-size: 0.75rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: #5b6976;
-  margin-bottom: 12px;
-}
-
-.log-list {
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.log-item {
-  font-size: 0.8125rem;
-  color: #dddee2;
-  padding: 6px 10px;
-  background: #1a1921;
-  border-radius: 6px;
-  font-family: 'SF Mono', 'Fira Code', monospace;
-}
-
-.log-item.success {
-  color: #a7f3d0;
-}
-
-.log-item.error {
-  color: #f87171;
-}
-
-/* === Upload icon animation === */
-.dropzone.loading .dropzone-icon svg {
-  animation: bounce-upload 1s ease-in-out infinite;
-}
-
-@keyframes bounce-upload {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-6px); }
-}
+.log-panel { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px 24px; }
+.log-item { font-size: 0.8125rem; background: #f1f5f9; padding: 6px 10px; border-radius: 6px; }
 
 /* === Utility === */
-.hidden {
-  display: none !important;
-}
-
-/* === Disclaimer === */
-.disclaimer {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  font-size: 0.8125rem;
-  color: #dddee2; /* Pearl Gray для чекбокса и его условий безопасности */
-  cursor: pointer;
-  line-height: 1.4;
-}
-
-.disclaimer input[type="checkbox"] {
-  margin-top: 2px;
-  flex-shrink: 0;
-  cursor: pointer;
-}
+.hidden { display: none !important; }
+.disclaimer { font-size: 0.8125rem; color: #64748b; }

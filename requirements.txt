@@ -27,6 +27,7 @@ mdurl==0.1.2
 murmurhash==1.0.15
 numpy==2.4.6
 packaging==26.2
+phonenumbers==9.0.33
 pluggy==1.6.0
 preshed==3.0.13
 pydantic==2.13.4
