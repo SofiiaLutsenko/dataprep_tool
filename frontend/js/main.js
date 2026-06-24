@@ -92,6 +92,9 @@ dropzone.addEventListener('click', () => {
 btnProcess.addEventListener('click', async () => {
   if (!selectedFile) return;
 
+  // 1. Get selected mode from the UI
+  const mode = document.querySelector('input[name="mask-mode"]:checked').value;
+
   setButtonEnabled(false);
   setStatus('loading', 'Processing your file...');
   dropzone.classList.add('loading');
@@ -99,9 +102,10 @@ btnProcess.addEventListener('click', async () => {
 
   try {
     addLog(`→ File received: ${selectedFile.name}`);
-    addLog('→ Scanning for emails and phone numbers...');
+    addLog(`→ Scanning with mode: ${mode}...`); // Logging the mode is helpful for debugging
 
-    const blob = await maskFile(selectedFile);
+    // 2. Pass mode to your API call function
+    const blob = await maskFile(selectedFile, mode);
 
     addLog('✓ Personal data removed successfully', 'success');
     addLog(`✓ File ready: masked_${selectedFile.name}`, 'success');

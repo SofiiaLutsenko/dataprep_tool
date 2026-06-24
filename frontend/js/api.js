@@ -2,11 +2,13 @@
 
 const API_BASE = 'https://api-dataprep.sofiialutsenko.com';
 
-async function maskFile(file) {
+// Update: added 'mode' parameter with a default value of 'full'
+async function maskFile(file, mode = 'full') {
   const formData = new FormData();
   formData.append('file', file);
 
-  const response = await fetch(`${API_BASE}/api/v1/mask/file`, {
+  // Update: added query parameter ?mode=${mode} to the URL
+  const response = await fetch(`${API_BASE}/api/v1/mask/file?mode=${mode}`, {
     method: 'POST',
     body: formData,
   });

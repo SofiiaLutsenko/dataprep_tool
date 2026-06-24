@@ -2,6 +2,8 @@ import re
 import spacy
 from spacy.language import Language
 from spacy.tokens import Doc
+import phonenumbers
+from functools import lru_cache
 
 # Load once at module level — loading per-request would be too slow
 _nlp = spacy.load("en_core_web_sm")
@@ -12,26 +14,31 @@ def _force_line_sentence_boundaries(doc: Doc) -> Doc:
     Forces a hard sentence boundary at the start of every structural line.
 
     en_core_web_sm's sentence segmentation comes from the dependency parser
-    and is unreliable on non-prose text -- resume-style content (section
+    and is unreliable on non-prose text — resume-style content (section
     headers, bullet points, no terminal punctuation) frequently gets read
     as one continuous sentence spanning multiple lines.
 
     This matters because the NER transition system's `In` action (entity
     continuation) explicitly refuses to extend a span across a token with
-    sent_start == 1 -- see spacy/pipeline/_parser_internals/ner.pyx. An
-    undetected sentence break at a line boundary is exactly what lets a
-    header like "CERTIFICATIONS & SKILLS" fuse with the next bullet line
-    into one giant misclassified ORG span.
+    sent_start == 1. An undetected sentence break at a line boundary is
+    exactly what lets a header like "CERTIFICATIONS & SKILLS" fuse with the
+    next bullet line into one giant misclassified ORG span.
+
+    IMPORTANT: spaCy only puts whitespace into a token's `.text` when
+    there are 2+ consecutive whitespace characters (e.g. a blank line). A
+    single "\n" between two tokens — the normal case for one-line-per-entry
+    resume content — lives in the *previous* token's `.whitespace_`, not in
+    anyone's `.text`. Checking `.text` alone misses exactly the case this
+    component exists to fix, so we check `.text_with_ws` (text + trailing
+    whitespace) instead, which covers both single and multi-newline breaks.
 
     Runs before `ner`: guarantees a sentence start at every newline
-    regardless of what the statistical parser inferred, so the NER
-    component's own boundary-respecting logic does the rest. No change to
-    _mask_entities() is needed -- it already just calls _nlp(text) once.
+    regardless of what the statistical parser inferred.
     """
     for i, token in enumerate(doc):
         if i == 0:
             continue
-        if "\n" in doc[i - 1].text:
+        if "\n" in doc[i - 1].text_with_ws:
             token.is_sent_start = True
     return doc
 
@@ -53,7 +60,7 @@ MAX_INPUT_LENGTH = 30_000  # 30 KB
 
 # --- PII Patterns ---
 
-# EMAIL: 
+# EMAIL:
 EMAIL_PATTERN = re.compile(
     r'(?<![a-zA-Z0-9._%+\-])'
     r'(?!\S*\.\.)'
@@ -100,12 +107,10 @@ STREET_ADDRESS_PATTERN = re.compile(
     re.IGNORECASE
 )
 
-# --- Date / Age Patterns (Phase 1.3 Hardened) ---
+# --- Date / Age Patterns ---
 
-# Secure separator handling optional colons/dashes and whitespace variables on BOTH sides
 _TRIGGER_SEP = r'(?:\s*[:,\-–—]\s*|\s+)'
 
-# Appended optional periods `\.?` to explicitly capture standard US prose abbreviations ("Jan.", "Feb.")
 _MONTH_NAMES = (
     r'(?:January|February|March|April|May|June|July|August|September|'
     r'October|November|December|'
@@ -114,18 +119,16 @@ _MONTH_NAMES = (
 
 _ORD = r'(?:st|nd|rd|th)?'
 
-# All branches require a 4-digit year to cleanly decouple from experience ranges like "2019-2022"
 _DATE_VALUE = (
     r'(?:'
-    r'\d{4}-\d{2}-\d{2}'                                          # 1. ISO (YYYY-MM-DD)
-    r'|\d{1,2}\.\d{1,2}\.\d{4}'                                   # 2. DD.MM.YYYY
-    r'|\d{1,2}/\d{1,2}/\d{4}'                                     # 3. MM/DD/YYYY
-    r'|' + _MONTH_NAMES + r'\s+\d{1,2}' + _ORD + r',?\s*\d{4}'   # 4. Month DD, YYYY
-    r'|\d{1,2}' + _ORD + r'\s+' + _MONTH_NAMES + r'\s+\d{4}'      # 5. DD Month YYYY
+    r'\d{4}-\d{2}-\d{2}'                          # ISO (YYYY-MM-DD)
+    r'|\d{1,2}\.\d{1,2}\.\d{4}'                   # DD.MM.YYYY
+    r'|\d{1,2}/\d{1,2}/\d{4}'                     # MM/DD/YYYY
+    r'|' + _MONTH_NAMES + r'\s+\d{1,2}' + _ORD + r',?\s*\d{4}'   # Month DD, YYYY
+    r'|\d{1,2}' + _ORD + r'\s+' + _MONTH_NAMES + r'\s+\d{4}'     # DD Month YYYY
     r')'
 )
 
-# Matches a DOB trigger label followed directly by a validated date value format
 DOB_PATTERN = re.compile(
     r'(?P<trigger>'
     r'(?:born|d\.o\.b\.?|dob|date\s+of\s+birth|birthd(?:ay|ate))'
@@ -135,18 +138,16 @@ DOB_PATTERN = re.compile(
     re.IGNORECASE,
 )
 
-# Matches explicit labels including spaces or missing colons ("Age 34")
 AGE_LABEL_PATTERN = re.compile(
     r'(?P<trigger>\bage\s*(?::\s*|\s+))'
     r'(?P<age>\d{1,3})'
-    r'(?!\.\d)'  # Защита: не маскируем целую часть флоатов (например, Age: 25.5)
+    r'(?!\.\d)'  # Protection: do not mask the integer part of floats (e.g., Age: 25.5)
     r'(?=\s*(?:years?)?(?:\s+old)?\b|\s|$)',
     re.IGNORECASE,
 )
 
-# Matches the trailing descriptive age layout ("34 years old", "28-year-old")
 AGE_TRAILING_PATTERN = re.compile(
-    r'(?<!\.)'  # Защита: не маскируем дробную часть флоатов (например, 25.5 years old)
+    r'(?<!\.)'  # Protection: do not mask the fractional part of floats (e.g., 25.5 years old)
     r'(?P<age>\d{1,3})'
     r'(?P<suffix>[ \t]*-?years?[ \t]*-?old)',
     re.IGNORECASE,
@@ -164,7 +165,20 @@ def _validate_input(text: str) -> str:
         raise ValueError(f"Input too large: {len(text)} chars (max {MAX_INPUT_LENGTH})")
     return text
 
-
+@lru_cache(maxsize=128)
+def is_valid_phone(text: str) -> bool:
+    try:
+        region = None if text.strip().startswith('+') else "DE"
+        parsed = phonenumbers.parse(text, region)
+        
+        is_valid = phonenumbers.is_possible_number(parsed)
+        
+        if not is_valid:
+            print(f"DEBUG: Rejected phone candidate: '{text}'") 
+        return is_valid
+    except phonenumbers.NumberParseException:
+        return False
+    
 # --- Masking Functions ---
 
 def mask_emails(text: str) -> str:
@@ -175,15 +189,29 @@ def mask_emails(text: str) -> str:
 def mask_phones(text: str) -> str:
     def _replace(match: re.Match) -> str:
         matched = match.group(0)
+        
+        # Keep year ranges unmasked
         if PHONE_YEAR_RANGE_PATTERN.match(matched):
             return matched
-        return '[PHONE]'
+            
+        # Use library as a filter
+        if is_valid_phone(matched):
+            return '[PHONE]'
+            
+        # If not a valid phone, return original text
+        return matched
+        
     return PHONE_PATTERN.sub(_replace, text)
+
+_PLACEHOLDER = {
+    "PERSON": "[NAME]",
+    "GPE": "[LOCATION]",
+    "LOC": "[LOCATION]",
+    "ORG": "[ORG]"
+}
 
 
 def _mask_entities(text: str, allowed_labels: set[str]) -> str:
-    """Generic entity masking helper. Replaces entities whose label is in
-    allowed_labels with [LABEL], skipping anything in the skill whitelist."""
     doc = _nlp(text)
     spans = []
 
@@ -209,18 +237,11 @@ def _mask_entities(text: str, allowed_labels: set[str]) -> str:
             spans.append((start_char, end_char, ent.label_))
 
     last_start = len(text) + 1
-    
-    _PLACEHOLDER = {
-        "PERSON": "[NAME]", 
-        "GPE": "[LOCATION]", 
-        "LOC": "[LOCATION]",
-        "ORG": "[ORG]"
-    }
-    
+
     for start, end, label in sorted(spans, key=lambda x: x[0], reverse=True):
         if end > last_start:
             continue
-        
+
         placeholder = _PLACEHOLDER.get(label, f"[{label}]")
         text = text[:start] + placeholder + text[end:]
         last_start = start
@@ -240,17 +261,13 @@ def mask_locations(text: str) -> str:
 
 
 def mask_dates(text: str) -> str:
-    """
-    Masks dates of birth and explicit age declarations using deterministic regex.
-    Protects employment duration records and baseline framework terms.
-    """
     # 1. DOB label + date value (label preserved)
     def _replace_dob(m: re.Match) -> str:
         return m.group('trigger') + '[DATE]'
 
     text = DOB_PATTERN.sub(_replace_dob, text)
 
-    # 2. Age label — Evaluates a realistic upper limit of 120 years to isolate data
+    # 2. Age label — Evaluates a realistic upper limit of 120 years
     def _replace_age_label(m: re.Match) -> str:
         try:
             if int(m.group('age')) <= 120:
@@ -261,7 +278,7 @@ def mask_dates(text: str) -> str:
 
     text = AGE_LABEL_PATTERN.sub(_replace_age_label, text)
 
-    # 3. Trailing "N years old" / "N-year-old" (suffix context preserved)
+    # 3. Trailing "N years old" / "N-year-old"
     def _replace_age_trailing(m: re.Match) -> str:
         try:
             if int(m.group('age')) <= 120:
@@ -275,13 +292,30 @@ def mask_dates(text: str) -> str:
     return text
 
 
-def mask_all(text: str, mask_dob: bool = True) -> str:
+def mask_all(text: str, mode: str = "full", mask_dob: bool = True) -> str:
+    """
+    mode="full": Regex + NER (Names, Orgs, Locations)
+    mode="fast": Only Regex (Emails, Phones, Dates)
+    """
     text = _validate_input(text)
+
+    # Run FIRST to protect dates from phone/NER masking
     if mask_dob:
-        text = mask_dates(text)  # Запускаем ПЕРВЫМ, чтобы защитить даты от маски телефонов и NER
+        text = mask_dates(text)
     text = mask_emails(text)
     text = mask_phones(text)
-    text = mask_names(text)
-    text = mask_orgs(text)
-    text = mask_locations(text)
+
+    # NER — only executed if "full" mode is requested.
+    # Run as a SINGLE combined pass instead of three separate mask_names/
+    # mask_orgs/mask_locations calls: each of those re-tokenizes the text
+    # with spaCy from scratch, and doing it three times in sequence means
+    # passes 2 and 3 run NER on text that already contains [NAME]/[ORG]
+    # placeholders from the previous pass — which shifts offsets and can
+    # change how the parser reads surrounding context. One pass is both
+    # ~3x faster (matters on the CX23) and avoids that placeholder-induced
+    # drift.
+    if mode == "full":
+        text = STREET_ADDRESS_PATTERN.sub("[LOCATION]", text)
+        text = _mask_entities(text, {"PERSON", "ORG", "GPE", "LOC"})
+
     return text
