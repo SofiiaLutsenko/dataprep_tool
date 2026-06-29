@@ -88,15 +88,23 @@
 
     <!-- What gets masked -->
     <section class="info-panel">
-      <p class="info-title">What gets removed</p>
-      <ul class="info-list">
-        <li class="info-item">Email addresses</li>
-        <li class="info-item">Phone numbers</li>
-        <li class="info-item">Person names</li>
-        <li class="info-item">Organizations</li>
-        <li class="info-item">Locations (Cities, Countries, Addresses)</li>
-        <li class="info-item">Dates & Age</li>
-      </ul>
+      <div class="info-header" id="info-header">
+        <p class="info-title">What gets removed</p>
+        <span class="info-toggle-icon" id="info-toggle-icon">▼</span>
+      </div>
+      
+      <div class="info-divider"></div> <!-- Эта линия появится при открытии -->
+      
+      <div class="info-content" id="info-content">
+        <ul class="info-list">
+          <li class="info-item">Email addresses</li>
+          <li class="info-item">Phone numbers</li>
+          <li class="info-item">Person names</li>
+          <li class="info-item">Organizations</li>
+          <li class="info-item">Locations (Cities, Countries, Addresses)</li>
+          <li class="info-item">Dates & Age</li>
+        </ul>
+      </div>
     </section>
 
     <!-- Log Panel -->

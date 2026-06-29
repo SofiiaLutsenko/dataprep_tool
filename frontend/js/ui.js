@@ -53,3 +53,13 @@ function downloadBlob(blob, filename) {
   a.click();
   URL.revokeObjectURL(url);
 }
+
+function toggleInfoPanel() {
+  const header = document.getElementById('info-header');
+  const content = document.getElementById('info-content');
+  
+  content.classList.toggle('open');
+  header.classList.toggle('open');
+}
+
+document.getElementById('info-header').addEventListener('click', toggleInfoPanel);

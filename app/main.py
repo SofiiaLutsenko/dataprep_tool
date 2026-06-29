@@ -2,9 +2,10 @@ import csv
 import io
 import logging
 import urllib.parse
+from contextlib import asynccontextmanager
 
 import anyio
-from fastapi import Depends, FastAPI, File, HTTPException, Query, Request, UploadFile
+from fastapi import Body, Depends, FastAPI, File, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from fastapi.security import APIKeyHeader
@@ -12,17 +13,21 @@ from pydantic import BaseModel, field_validator
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
+from app.auth_utils import hash_password
 from app.config import settings
 from app.core import MAX_INPUT_LENGTH, mask_all
+from app.database import Base, engine, get_db
+from app.models import User
 
 logger = logging.getLogger("dataprep")
 
 # --- Auth ---
 
 API_KEY_HEADER = APIKeyHeader(name="X-API-Key", auto_error=False)
-
 
 async def verify_api_key(api_key: str = Depends(API_KEY_HEADER)) -> None:
     if not api_key or api_key != settings.api_key:
@@ -31,6 +36,15 @@ async def verify_api_key(api_key: str = Depends(API_KEY_HEADER)) -> None:
             detail="Invalid or missing API key"
         )
 
+# --- Lifespan Manager (Replaces deprecated startup/shutdown events) ---
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Automatically create tables in PostgreSQL on application startup
+    #async with engine.begin() as conn:
+    #   await conn.run_sync(Base.metadata.create_all)
+    yield
+    # Shutdown actions (if needed) can be placed here
 
 # --- App ---
 
@@ -39,7 +53,8 @@ limiter = Limiter(key_func=get_remote_address)
 app = FastAPI(
     title="DataPrep Tool",
     description="PII masking API for HR and Finance workflows",
-    version=settings.app_version
+    version=settings.app_version,
+    lifespan=lifespan
 )
 
 # Trust X-Forwarded-For only from localhost (Nginx on same machine)
@@ -59,8 +74,35 @@ app.add_middleware(
     allow_credentials=True,
 )
 
-
 # --- Schemas ---
+
+class UserRegisterRequest(BaseModel):
+    email: str
+    password: str
+
+    @field_validator("email")
+    @classmethod
+    def validate_email_format(cls, v: str) -> str:
+        # Simple validation check for internal safety
+        if "@" not in v:
+            raise ValueError("Invalid email address format")
+        return v.lower().strip()
+
+    @field_validator("password")
+    @classmethod
+    def password_length_check(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters long")
+        return v
+
+class UserResponse(BaseModel):
+    id: int
+    email: str
+    is_active: bool
+
+    # Allows Pydantic to read SQLAlchemy models directly (Pydantic v2 syntax)
+    model_config = {"from_attributes": True}
+
 
 class TextRequest(BaseModel):
     text: str
@@ -72,11 +114,9 @@ class TextRequest(BaseModel):
             raise ValueError("Input text exceeds maximum allowed length")
         return v
 
-
 class TextResponse(BaseModel):
     masked_text: str
     chars_processed: int
-
 
 # --- File Upload Helpers ---
 
@@ -84,12 +124,10 @@ ALLOWED_EXTENSIONS = {".txt", ".csv"}
 CSV_INJECTION_CHARS = ("=", "@", "+", "-")
 MAX_FILE_BYTES = 30_000  # aligned with MAX_INPUT_LENGTH in core.py (~30KB)
 
-
 def _is_utf8_text_content(data: bytes) -> bool:
     """Reject binary files by checking for null bytes in first 1024 bytes.
     Note: UTF-16 encoded files will also be rejected — UTF-8 is required."""
     return b"\x00" not in data[:1024]
-
 
 async def _read_file_chunked(file: UploadFile, max_bytes: int) -> bytes:
     """Read file in chunks, raise 413 if size exceeds limit."""
@@ -102,7 +140,6 @@ async def _read_file_chunked(file: UploadFile, max_bytes: int) -> bytes:
                 detail=f"File too large. Maximum size is {max_bytes // 1000}KB"
             )
     return bytes(content)
-
 
 def _sanitize_csv(text: str) -> str:
     """Prevent CSV injection using proper CSV parsing.
@@ -123,12 +160,36 @@ def _sanitize_csv(text: str) -> str:
 
     return output_stream.getvalue()
 
-
 # --- Endpoints ---
 
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
+
+@app.post("/api/v1/auth/register", response_model=UserResponse, status_code=201)
+async def register_user(
+    body: UserRegisterRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    # Check if a user with this email already exists
+    query = select(User).where(User.email == body.email)
+    result = await db.execute(query)
+    existing_user = result.scalar_one_or_none()
+
+    if existing_user:
+        raise HTTPException(
+            status_code=400,
+            detail="User with this email already registered"
+        )
+
+    # Hash the password and save the new user
+    hashed_pass = hash_password(body.password)
+    new_user = User(email=body.email, hashed_password=hashed_pass)
+    
+    db.add(new_user)
+    await db.flush() # Forces DB to generate an ID without committing the entire transaction yet
+    
+    return new_user
 
 @app.post("/api/v1/mask/text", response_model=TextResponse)
 @limiter.limit("10/minute")
@@ -157,7 +218,6 @@ async def mask_file(
     file: UploadFile = File(...),
     mode: str = Query("full", pattern="^(fast|full)$")
 ):
-
     # Validate extension
     filename = file.filename or "upload"
     ext = "." + filename.rsplit(".", 1)[-1].lower() if "." in filename else ""

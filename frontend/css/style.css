@@ -7,8 +7,8 @@
 
 body {
   font-family: 'Inter', system-ui, sans-serif;
-  background-color: #f1f5f9; /* Светлый Slate фон */
-  color: #334155;            /* Темный текст для читаемости */
+  background-color: #f1f5f9; /* Light Slate background */
+  color: #334155;            /* Dark text for readability */
   min-height: 100vh;
   display: flex;
   align-items: center;
@@ -132,6 +132,7 @@ body {
 .btn-primary {
   width: 100%;
   padding: 12px;
+  margin-top: 8px; /* Added spacing from the disclaimer */
   background-color: #1e293b;
   color: #ffffff;
   border: none;
@@ -156,12 +157,98 @@ body {
 }
 
 /* === Info Panel & Logs === */
-.info-panel { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px 24px; }
-.info-title, .log-title { font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: #64748b; margin-bottom: 12px; }
-.info-item { font-size: 0.875rem; color: #334155; }
+.info-panel { 
+  background: #f8fafc; 
+  border: 1px solid #e2e8f0; 
+  border-radius: 12px; 
+  padding: 20px 24px; 
+}
 
-.log-panel { background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px 24px; }
-.log-item { font-size: 0.8125rem; background: #f1f5f9; padding: 6px 10px; border-radius: 6px; }
+.info-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  padding: 4px 0;
+  user-select: none;
+}
+
+/* New: Divider style */
+.info-divider {
+  height: 1px;
+  background-color: #d6dde6; /* Same as border color for harmony */
+  margin: 12px 0; /* Vertical space */
+  display: none;  /* Hidden by default */
+}
+
+/* Show divider only when panel is open */
+.info-header.open + .info-divider {
+  display: block;
+}
+
+.info-title, .log-title { 
+  font-size: 0.75rem; 
+  font-weight: 600; 
+  text-transform: uppercase; 
+  color: #64748b; 
+}
+
+.log-title {
+  margin-bottom: 12px; 
+}
+
+/* Arrow icon for the collapsible panel */
+.info-toggle-icon {
+  color: #64748b;
+  font-size: 0.75rem;
+  transition: transform 0.3s ease;
+}
+
+/* Rotate icon when the panel is open */
+.info-header.open .info-toggle-icon {
+  transform: rotate(180deg);
+}
+
+/* 
+  Animation container for the list. 
+  max-height: 0 hides the content. 
+  overflow: hidden keeps content clipped during animation. 
+*/
+.info-content {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease-out;
+}
+
+/* Class toggled by JS to expand the panel */
+.info-content.open {
+  max-height: 200px; /* Adjust based on content height */
+}
+
+.info-item { 
+  font-size: 0.875rem; 
+  color: #334155; 
+  margin-bottom: 4px; 
+}
+
+.info-item:last-child {
+  margin-bottom: 0;
+}
+
+.log-panel { 
+  background: #ffffff; 
+  border: 1px solid #e2e8f0; 
+  border-radius: 12px; 
+  padding: 20px 24px; 
+}
+
+.log-item { 
+  font-size: 0.8125rem; 
+  background: #f1f5f9; 
+  padding: 6px 10px; 
+  border-radius: 6px; 
+  margin-bottom: 4px;
+}
 
 /* === Utility === */
 .hidden { display: none !important; }
