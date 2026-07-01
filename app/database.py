@@ -3,8 +3,6 @@ from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, Asyn
 from sqlalchemy.orm import DeclarativeBase
 from app.config import settings
 
-DATABASE_URL = "postgresql+asyncpg://admin:password@127.0.0.1:5432/dataprep"
-
 engine = create_async_engine(
     settings.database_url,
     echo=False,

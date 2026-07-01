@@ -17,11 +17,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
-from app.auth_utils import hash_password
+from app.auth_utils import get_password_hash
 from app.config import settings
 from app.core import MAX_INPUT_LENGTH, mask_all
-from app.database import Base, engine, get_db
-from app.models import User
+from app.database import AsyncSessionLocal, Base, engine, get_db
+from app.models import SubscriptionTier, TierType, User, normalize_email
+from app.schemas import UserCreate, UserResponse
+from app.payments import router as payments_router  # New payments router
+
+from dotenv import load_dotenv
+load_dotenv()
 
 logger = logging.getLogger("dataprep")
 
@@ -36,15 +41,20 @@ async def verify_api_key(api_key: str = Depends(API_KEY_HEADER)) -> None:
             detail="Invalid or missing API key"
         )
 
-# --- Lifespan Manager (Replaces deprecated startup/shutdown events) ---
+# --- Lifespan Manager ---
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Automatically create tables in PostgreSQL on application startup
-    #async with engine.begin() as conn:
-    #   await conn.run_sync(Base.metadata.create_all)
+    # Seed the BASIC subscription tier
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            select(SubscriptionTier).where(SubscriptionTier.name == TierType.BASIC)
+        )
+        if result.scalar_one_or_none() is None:
+            session.add(SubscriptionTier(name=TierType.BASIC, daily_request_limit=50))
+            await session.commit()
+
     yield
-    # Shutdown actions (if needed) can be placed here
 
 # --- App ---
 
@@ -57,14 +67,9 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Trust X-Forwarded-For only from localhost (Nginx on same machine)
 app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="127.0.0.1")
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
-
-# Request size limiting is handled at the infrastructure level (Nginx).
-# See deployment configuration for client_max_body_size setting.
-# Pydantic field_validator provides application-level protection for text length.
 
 app.add_middleware(
     CORSMiddleware,
@@ -73,6 +78,9 @@ app.add_middleware(
     allow_headers=["*"],
     allow_credentials=True,
 )
+
+# Register the payments router
+app.include_router(payments_router)
 
 # --- Schemas ---
 
@@ -83,7 +91,6 @@ class UserRegisterRequest(BaseModel):
     @field_validator("email")
     @classmethod
     def validate_email_format(cls, v: str) -> str:
-        # Simple validation check for internal safety
         if "@" not in v:
             raise ValueError("Invalid email address format")
         return v.lower().strip()
@@ -94,14 +101,6 @@ class UserRegisterRequest(BaseModel):
         if len(v) < 8:
             raise ValueError("Password must be at least 8 characters long")
         return v
-
-class UserResponse(BaseModel):
-    id: int
-    email: str
-    is_active: bool
-
-    # Allows Pydantic to read SQLAlchemy models directly (Pydantic v2 syntax)
-    model_config = {"from_attributes": True}
 
 
 class TextRequest(BaseModel):
@@ -122,17 +121,14 @@ class TextResponse(BaseModel):
 
 ALLOWED_EXTENSIONS = {".txt", ".csv"}
 CSV_INJECTION_CHARS = ("=", "@", "+", "-")
-MAX_FILE_BYTES = 30_000  # aligned with MAX_INPUT_LENGTH in core.py (~30KB)
+MAX_FILE_BYTES = 30_000
 
 def _is_utf8_text_content(data: bytes) -> bool:
-    """Reject binary files by checking for null bytes in first 1024 bytes.
-    Note: UTF-16 encoded files will also be rejected — UTF-8 is required."""
     return b"\x00" not in data[:1024]
 
 async def _read_file_chunked(file: UploadFile, max_bytes: int) -> bytes:
-    """Read file in chunks, raise 413 if size exceeds limit."""
     content = bytearray()
-    while chunk := await file.read(1024 * 1024):  # 1MB chunks
+    while chunk := await file.read(1024 * 1024):
         content.extend(chunk)
         if len(content) > max_bytes:
             raise HTTPException(
@@ -142,14 +138,10 @@ async def _read_file_chunked(file: UploadFile, max_bytes: int) -> bytes:
     return bytes(content)
 
 def _sanitize_csv(text: str) -> str:
-    """Prevent CSV injection using proper CSV parsing.
-    Uses csv module to correctly handle quoted fields with commas."""
     input_stream = io.StringIO(text)
     output_stream = io.StringIO()
-
     reader = csv.reader(input_stream)
     writer = csv.writer(output_stream)
-
     for row in reader:
         clean_row = []
         for field in row:
@@ -157,7 +149,6 @@ def _sanitize_csv(text: str) -> str:
                 field = f"'{field}"
             clean_row.append(field)
         writer.writerow(clean_row)
-
     return output_stream.getvalue()
 
 # --- Endpoints ---
@@ -171,7 +162,6 @@ async def register_user(
     body: UserRegisterRequest,
     db: AsyncSession = Depends(get_db)
 ):
-    # Check if a user with this email already exists
     query = select(User).where(User.email == body.email)
     result = await db.execute(query)
     existing_user = result.scalar_one_or_none()
@@ -182,21 +172,24 @@ async def register_user(
             detail="User with this email already registered"
         )
 
-    # Hash the password and save the new user
-    hashed_pass = hash_password(body.password)
-    new_user = User(email=body.email, hashed_password=hashed_pass)
-    
+    hashed_pass = get_password_hash(body.password)
+    new_user = User(email=normalize_email(body.email), hashed_password=hashed_pass)
+
     db.add(new_user)
-    await db.flush() # Forces DB to generate an ID without committing the entire transaction yet
-    
+    await db.flush()
+    await db.refresh(new_user)
     return new_user
 
-@app.post("/api/v1/mask/text", response_model=TextResponse)
+@app.post(
+    "/api/v1/mask/text",
+    response_model=TextResponse,
+    dependencies=[Depends(verify_api_key)],
+)
 @limiter.limit("10/minute")
 def mask_text(
     request: Request,
     body: TextRequest,
-    mode: str = Query("full", pattern="^(fast|full)$")
+    mode: str = Query("full", pattern="^(fast|full)$"),
 ):
     try:
         result = mask_all(body.text, mode=mode)
@@ -211,14 +204,16 @@ def mask_text(
         logger.warning("Invalid input value received")
         raise HTTPException(status_code=400, detail="Invalid input data")
 
-@app.post("/api/v1/mask/file")
+@app.post(
+    "/api/v1/mask/file",
+    dependencies=[Depends(verify_api_key)],
+)
 @limiter.limit("3/minute")
 async def mask_file(
     request: Request,
     file: UploadFile = File(...),
-    mode: str = Query("full", pattern="^(fast|full)$")
+    mode: str = Query("full", pattern="^(fast|full)$"),
 ):
-    # Validate extension
     filename = file.filename or "upload"
     ext = "." + filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
     if ext not in ALLOWED_EXTENSIONS:
@@ -227,17 +222,14 @@ async def mask_file(
             detail=f"Unsupported file type. Allowed: {', '.join(ALLOWED_EXTENSIONS)}"
         )
 
-    # Read in chunks — prevents OOM
     content = await _read_file_chunked(file, MAX_FILE_BYTES)
 
-    # Validate content (not just extension)
     if not _is_utf8_text_content(content):
         raise HTTPException(
             status_code=422,
             detail="File appears to be binary or non-UTF-8 encoded."
         )
 
-    # Decode
     try:
         text = content.decode("utf-8")
     except UnicodeDecodeError:
@@ -246,19 +238,15 @@ async def mask_file(
             detail="File encoding not supported. Please upload a UTF-8 encoded file"
         )
 
-    # Sanitize CSV injection before masking
     if ext == ".csv":
         text = _sanitize_csv(text)
 
-    # Mask — run in thread pool to avoid blocking event loop
     try:
-        # Pass the mode parameter to the core logic via thread pool
         masked = await anyio.to_thread.run_sync(mask_all, text, mode)
     except ValueError:
         logger.warning("File content validation failed")
         raise HTTPException(status_code=400, detail="Invalid file content")
 
-    # Sanitize filename — prevents Header Injection
     safe_filename = urllib.parse.quote(filename, safe=".-_")
 
     return Response(
